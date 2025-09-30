@@ -623,5 +623,5 @@ def main():
     # Always show chat interface (even if no documents loaded initially)
     show_chat_interface_always()
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
