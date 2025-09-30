@@ -12,19 +12,16 @@ pydantic==2.5.0
 # Firebase Integration
 firebase-admin==6.2.0
 
-# LangChain and AI
-langchain==0.1.0
-langchain-community==0.0.10
-langchain-groq==0.0.3
+# LangChain and AI - COMPATIBLE VERSIONS
+langchain
+langchain-community
+langchain-groq
+langchain-core
 
 # Vector Store and Embeddings
 faiss-cpu==1.7.4
 sentence-transformers==2.2.2
 
 # Document Processing
-unstructured==0.11.2
 pypdf2==3.0.1
-pymupdf==1.23.8
-
-# Additional Utilities
 requests==2.31.0
