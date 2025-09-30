@@ -638,7 +638,7 @@ if os.getenv("RENDER"):
         allow_origins=[
             "https://hospital-chat-bot-frontend.vercel.app/",  # Update with your actual frontend URL
                     # Add your custom domain if any
-            "http://localhost:5173",                    # Keep for development
+            "http://localhost:5173/",                    # Keep for development
         ],
         allow_credentials=True,
         allow_methods=["*"],
