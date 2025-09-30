@@ -251,8 +251,8 @@ body {
 }
 
 .connection-status.connecting {
-  background: rgba(255, 193, 7, 0.15);
-  color: #856404;
+  background: rgb(255, 255, 255);
+  color: #ffffff;
 }
 
 .connection-status.connecting .status-dot {
@@ -260,8 +260,8 @@ body {
 }
 
 .connection-status.connected {
-  background: rgba(40, 167, 69, 0.15);
-  color: #155724;
+  background: rgb(255, 255, 255);
+  color: #ffffff;
 }
 
 .connection-status.connected .status-dot {
@@ -270,11 +270,11 @@ body {
 
 .connection-status.authenticated {
   background: rgba(0, 123, 255, 0.15);
-  color: #004085;
+  color: #ffffff;
 }
 
 .connection-status.authenticated .status-dot {
-  background: #007bff;
+  background: #00ff00;
 }
 
 .connection-status.error {

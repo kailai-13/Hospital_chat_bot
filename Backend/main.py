@@ -622,12 +622,34 @@ async def startup_event():
 # =============================================================================
 # MAIN
 # =============================================================================
+# =============================================================================
+# PRODUCTION CONFIGURATION
+# =============================================================================
+import os
+
+# Get port from environment variable (Render sets this)
+PORT = int(os.getenv("PORT", 8000))
+
+# Configure CORS for production
+if os.getenv("RENDER"):
+    # Production CORS settings
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "https://hospital-chat-bot-frontend.vercel.app/",  # Update with your actual frontend URL
+            "https://your-custom-domain.com",           # Add your custom domain if any
+            "http://localhost:5173",                    # Keep for development
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=8000,
-        reload=True,
+        port=PORT,
         log_level="info"
     )
