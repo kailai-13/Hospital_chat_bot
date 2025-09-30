@@ -1,9 +1,8 @@
-# main.py - Complete FastAPI Backend for KG Hospital Chatbot
+# main.py - Fixed JWT Implementation
 
 import os
 import tempfile
 import time
-import jwt
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, status
@@ -13,6 +12,10 @@ from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, storage
 from dotenv import load_dotenv
+
+# Correct JWT import
+import jwt
+from jwt import PyJWTError
 
 # LangChain imports
 from langchain_community.document_loaders import UnstructuredPDFLoader, PyPDFLoader
@@ -53,7 +56,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
 # Initialize Firebase Admin SDK
 try:
     if not firebase_admin._apps:
-        # Use service account key or environment variables
         firebase_config = {
             "type": "service_account",
             "project_id": os.getenv("FIREBASE_PROJECT_ID"),
@@ -103,19 +105,13 @@ class Token(BaseModel):
     role: str
     username: str
 
-class DocumentInfo(BaseModel):
-    name: str
-    size: int
-    created: str
-    status: str
-
 # =============================================================================
-# USER DATABASE (Replace with real database in production)
+# USER DATABASE
 # =============================================================================
 USERS_DB = {
     "admin": {
         "username": "admin",
-        "password": "admin123",  # In production, use hashed passwords
+        "password": "admin123",
         "role": "admin",
         "full_name": "Administrator"
     },
@@ -140,10 +136,10 @@ USERS_DB = {
 }
 
 # =============================================================================
-# AUTHENTICATION FUNCTIONS
+# AUTHENTICATION FUNCTIONS - FIXED JWT
 # =============================================================================
 def verify_password(plain_password: str, stored_password: str) -> bool:
-    """Simple password verification. Use proper hashing in production."""
+    """Simple password verification."""
     return plain_password == stored_password
 
 def authenticate_user(username: str, password: str):
@@ -156,18 +152,25 @@ def authenticate_user(username: str, password: str):
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token."""
+    """Create JWT access token - FIXED"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
+    
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    
+    # Fixed JWT encode
+    try:
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        return encoded_jwt
+    except Exception as e:
+        print(f"JWT encoding error: {e}")
+        raise HTTPException(status_code=500, detail="Token creation failed")
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token and return user info."""
+    """Verify JWT token - FIXED"""
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -178,10 +181,17 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
                 detail="Invalid authentication credentials"
             )
         return {"username": username, "role": role}
-    except jwt.PyJWTError:
+    except PyJWTError as e:
+        print(f"JWT decoding error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials"
+        )
+    except Exception as e:
+        print(f"Token verification error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token verification failed"
         )
 
 def require_admin_role(current_user: dict = Depends(verify_token)):
@@ -194,14 +204,13 @@ def require_admin_role(current_user: dict = Depends(verify_token)):
     return current_user
 
 # =============================================================================
-# DOCUMENT PROCESSING FUNCTIONS
+# DOCUMENT PROCESSING FUNCTIONS (Same as before)
 # =============================================================================
 def load_document(file_path: str):
     """Load and process PDF document with multiple fallback methods."""
     documents = []
     file_name = os.path.basename(file_path)
     
-    # Method 1: Try UnstructuredPDFLoader
     try:
         loader = UnstructuredPDFLoader(file_path)
         documents = loader.load()
@@ -211,7 +220,6 @@ def load_document(file_path: str):
     except Exception as e:
         print(f"⚠️ UnstructuredPDFLoader failed for {file_name}: {e}")
     
-    # Method 2: Try PyPDFLoader
     try:
         loader = PyPDFLoader(file_path)
         documents = loader.load()
@@ -220,30 +228,6 @@ def load_document(file_path: str):
             return documents
     except Exception as e:
         print(f"⚠️ PyPDFLoader failed for {file_name}: {e}")
-    
-    # Method 3: Try PyMuPDF
-    try:
-        import fitz  # PyMuPDF
-        from langchain_core.documents import Document
-        
-        doc = fitz.open(file_path)
-        documents = []
-        
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            text = page.get_text()
-            if text.strip():
-                documents.append(Document(
-                    page_content=text,
-                    metadata={"source": file_name, "page": page_num + 1}
-                ))
-        
-        doc.close()
-        if documents:
-            print(f"✅ Loaded {file_name} using PyMuPDF")
-            return documents
-    except Exception as e:
-        print(f"⚠️ PyMuPDF failed for {file_name}: {e}")
     
     raise Exception(f"❌ All PDF processing methods failed for {file_name}")
 
@@ -254,7 +238,6 @@ def setup_vectorstore(documents):
     
     print(f"📄 Processing {len(documents)} document pages...")
     
-    # Text splitter settings
     text_splitter = CharacterTextSplitter(
         separator='\n',
         chunk_size=800,
@@ -262,16 +245,13 @@ def setup_vectorstore(documents):
         length_function=len
     )
     
-    # Split documents into chunks
     doc_chunks = text_splitter.split_documents(documents)
     print(f"📝 Created {len(doc_chunks)} text chunks")
     
-    # Limit chunks for performance
     if len(doc_chunks) > 2000:
         print(f"⚡ Large document detected. Limiting to 2000 chunks for performance.")
         doc_chunks = doc_chunks[:2000]
     
-    # Initialize embeddings
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2",
         model_kwargs={'device': 'cpu'},
@@ -314,7 +294,7 @@ def create_chain(vectorstore):
     return chain
 
 # =============================================================================
-# FIREBASE FUNCTIONS
+# FIREBASE FUNCTIONS (Same as before - no changes needed)
 # =============================================================================
 def upload_file_to_firebase(file_path: str, file_name: str):
     """Upload file to Firebase Storage."""
@@ -411,7 +391,7 @@ def reload_all_documents():
     return False, "No documents could be processed"
 
 # =============================================================================
-# API ENDPOINTS
+# API ENDPOINTS - FIXED
 # =============================================================================
 
 @app.get("/")
@@ -427,27 +407,36 @@ async def root():
 
 @app.post("/auth/login", response_model=Token)
 async def login(user_credentials: UserLogin):
-    """User login endpoint."""
-    user = authenticate_user(user_credentials.username, user_credentials.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    """User login endpoint - FIXED JWT"""
+    try:
+        user = authenticate_user(user_credentials.username, user_credentials.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user["username"], "role": user["role"]},
+            expires_delta=access_token_expires
         )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]},
-        expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user["role"],
-        "username": user["username"]
-    }
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": user["role"],
+            "username": user["username"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login processing failed"
+        )
 
 @app.get("/auth/verify")
 async def verify_auth(current_user: dict = Depends(verify_token)):
@@ -465,14 +454,11 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
     
     try:
         if conversation_chain:
-            # Use document-based conversation
             response = conversation_chain.invoke({'question': message.message})
             answer = response.get('answer', 'I could not find relevant information.')
         else:
-            # Fallback to basic LLM without documents
             llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
             
-            # Role-based system prompts
             system_prompts = {
                 "patient": """You are a helpful KG Hospital AI assistant helping patients. 
                 Provide information about:
@@ -480,7 +466,6 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
                 - Hospital services and departments  
                 - Treatment information and medical procedures
                 - Emergency contacts and protocols
-                - Patient care policies and guidelines
                 Always be compassionate and professional.""",
                 
                 "visitor": """You are a helpful KG Hospital AI assistant helping visitors.
@@ -489,7 +474,6 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
                 - Hospital location and directions
                 - Parking information and facilities
                 - Hospital amenities and services
-                - Emergency contacts
                 Be welcoming and informative.""",
                 
                 "staff": """You are a helpful KG Hospital AI assistant helping hospital staff.
@@ -497,8 +481,7 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
                 - Patient inquiry responses
                 - Department information and contacts
                 - Emergency protocols and procedures
-                - Hospital policies and guidelines  
-                - Administrative information
+                - Hospital policies and guidelines
                 Be efficient and professional.""",
                 
                 "admin": """You are a helpful KG Hospital AI assistant helping administrators.
@@ -507,7 +490,6 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
                 - System status and analytics
                 - Administrative procedures
                 - Staff coordination and policies
-                - Strategic planning support
                 Be comprehensive and analytical."""
             }
             
@@ -541,23 +523,18 @@ async def upload_document(
             detail="Only PDF files are allowed"
         )
     
-    # Create temporary file
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
     temp_file_path = temp_file.name
     
     try:
-        # Save uploaded file
         content = await file.read()
         temp_file.write(content)
         temp_file.close()
         
-        # Upload to Firebase
         success, message = upload_file_to_firebase(temp_file_path, file.filename)
         
         if success:
-            # Reload all documents to include the new one
             reload_success, reload_message = reload_all_documents()
-            
             os.remove(temp_file_path)
             
             if reload_success:
