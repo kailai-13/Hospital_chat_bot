@@ -1,4 +1,4 @@
-# main.py - Fixed JWT Implementation
+# main.py - Complete Fixed Version
 
 import os
 import tempfile
@@ -13,9 +13,9 @@ import firebase_admin
 from firebase_admin import credentials, storage
 from dotenv import load_dotenv
 
-# Correct JWT import
+# Fixed JWT imports
 import jwt
-from jwt import PyJWTError
+from jwt.exceptions import InvalidTokenError
 
 # LangChain imports
 from langchain_community.document_loaders import UnstructuredPDFLoader, PyPDFLoader
@@ -136,7 +136,7 @@ USERS_DB = {
 }
 
 # =============================================================================
-# AUTHENTICATION FUNCTIONS - FIXED JWT
+# AUTHENTICATION FUNCTIONS - COMPLETELY FIXED
 # =============================================================================
 def verify_password(plain_password: str, stored_password: str) -> bool:
     """Simple password verification."""
@@ -152,7 +152,7 @@ def authenticate_user(username: str, password: str):
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token - FIXED"""
+    """Create JWT access token."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -161,7 +161,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     
     to_encode.update({"exp": expire})
     
-    # Fixed JWT encode
     try:
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
@@ -170,29 +169,25 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         raise HTTPException(status_code=500, detail="Token creation failed")
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token - FIXED"""
+    """Verify JWT token."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         role: str = payload.get("role")
         if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials"
-            )
+            raise credentials_exception
         return {"username": username, "role": role}
-    except PyJWTError as e:
-        print(f"JWT decoding error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
-        )
+    except InvalidTokenError:
+        raise credentials_exception
     except Exception as e:
         print(f"Token verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token verification failed"
-        )
+        raise credentials_exception
 
 def require_admin_role(current_user: dict = Depends(verify_token)):
     """Require admin role for protected endpoints."""
@@ -204,7 +199,7 @@ def require_admin_role(current_user: dict = Depends(verify_token)):
     return current_user
 
 # =============================================================================
-# DOCUMENT PROCESSING FUNCTIONS (Same as before)
+# DOCUMENT PROCESSING FUNCTIONS
 # =============================================================================
 def load_document(file_path: str):
     """Load and process PDF document with multiple fallback methods."""
@@ -294,7 +289,7 @@ def create_chain(vectorstore):
     return chain
 
 # =============================================================================
-# FIREBASE FUNCTIONS (Same as before - no changes needed)
+# FIREBASE FUNCTIONS
 # =============================================================================
 def upload_file_to_firebase(file_path: str, file_name: str):
     """Upload file to Firebase Storage."""
@@ -391,7 +386,7 @@ def reload_all_documents():
     return False, "No documents could be processed"
 
 # =============================================================================
-# API ENDPOINTS - FIXED
+# API ENDPOINTS
 # =============================================================================
 
 @app.get("/")
@@ -407,7 +402,7 @@ async def root():
 
 @app.post("/auth/login", response_model=Token)
 async def login(user_credentials: UserLogin):
-    """User login endpoint - FIXED JWT"""
+    """User login endpoint."""
     try:
         user = authenticate_user(user_credentials.username, user_credentials.password)
         if not user:
@@ -422,6 +417,8 @@ async def login(user_credentials: UserLogin):
             data={"sub": user["username"], "role": user["role"]},
             expires_delta=access_token_expires
         )
+        
+        print(f"✅ User {user['username']} logged in successfully")
         
         return {
             "access_token": access_token,
@@ -453,6 +450,8 @@ async def chat(message: ChatMessage, current_user: dict = Depends(verify_token))
     global conversation_chain
     
     try:
+        print(f"💬 Chat request from {current_user['username']} ({current_user['role']}): {message.message}")
+        
         if conversation_chain:
             response = conversation_chain.invoke({'question': message.message})
             answer = response.get('answer', 'I could not find relevant information.')

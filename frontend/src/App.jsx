@@ -1,4 +1,4 @@
-// App.js - Complete React Frontend with Backend Integration
+// App.js - Fixed UI Bugs and Responsiveness Issues
 
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
@@ -6,7 +6,7 @@ import './App.css';
 const API_BASE_URL = 'http://localhost:8000';
 
 const App = () => {
-  // State management
+  // State management (same as before)
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [userRole, setUserRole] = useState('patient');
@@ -16,16 +16,32 @@ const App = () => {
   const [showLogin, setShowLogin] = useState(true);
   const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '' });
   const [authError, setAuthError] = useState('');
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [systemStatus, setSystemStatus] = useState({});
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
+  const [messageCount, setMessageCount] = useState(0);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const uploadAreaRef = useRef(null);
+  const adminModalRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  // Auto-resize textarea
+  const autoResizeTextarea = () => {
+    const textarea = document.querySelector('.message-input');
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+  };
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -36,37 +52,22 @@ const App = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Check authentication on component mount
+  // Handle window resize for responsiveness
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      verifyAuth(token);
-    } else {
-      setShowLogin(true);
-      setConnectionStatus('disconnected');
-    }
-    // Test backend connection
-    testBackendConnection();
+    const handleResize = () => {
+      if (chatContainerRef.current) {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Test backend connection
-  const testBackendConnection = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/`);
-      if (response.ok) {
-        setConnectionStatus('connected');
-        const data = await response.json();
-        console.log('✅ Backend connected:', data.message);
-      } else {
-        setConnectionStatus('error');
-      }
-    } catch (error) {
-      console.error('❌ Backend connection failed:', error);
-      setConnectionStatus('error');
-    }
-  };
-
-  // API Functions with error handling
+  // All API functions and other functions remain the same...
   const api = {
     login: async (credentials) => {
       try {
@@ -224,6 +225,65 @@ const App = () => {
     }
   };
 
+  // Check authentication on component mount
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      verifyAuth(token);
+    } else {
+      setShowLogin(true);
+      setConnectionStatus('disconnected');
+    }
+    testBackendConnection();
+  }, []);
+
+  // Test backend connection
+  const testBackendConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/`);
+      if (response.ok) {
+        setConnectionStatus('connected');
+        const data = await response.json();
+        console.log('✅ Backend connected:', data.message);
+      } else {
+        setConnectionStatus('error');
+      }
+    } catch (error) {
+      console.error('❌ Backend connection failed:', error);
+      setConnectionStatus('error');
+    }
+  };
+
+  // Handle click outside modal to close
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (adminModalRef.current && !adminModalRef.current.contains(event.target)) {
+        if (event.target.classList.contains('admin-modal-overlay')) {
+          setShowAdminModal(false);
+        }
+      }
+    };
+
+    if (showAdminModal) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showAdminModal]);
+
+  // Hide quick actions after 3 messages
+  useEffect(() => {
+    if (messageCount >= 3) {
+      setShowQuickActions(false);
+    }
+  }, [messageCount]);
+
   const verifyAuth = async (token) => {
     try {
       setLoading(true);
@@ -234,14 +294,15 @@ const App = () => {
       setShowLogin(false);
       setConnectionStatus('authenticated');
       
-      // Welcome message after login
+      setMessageCount(0);
+      setShowQuickActions(true);
+      
       setMessages([{
         type: 'bot',
         content: `Welcome ${userData.username}! You are logged in as ${userData.role}. How can I help you today?`,
         timestamp: new Date().toLocaleTimeString()
       }]);
       
-      // Load admin data if admin
       if (userData.role === 'admin') {
         await loadDocuments(token);
         await loadSystemStatus();
@@ -271,8 +332,6 @@ const App = () => {
       if (response.access_token) {
         localStorage.setItem('access_token', response.access_token);
         await verifyAuth(response.access_token);
-        
-        // Clear login form
         setLoginCredentials({ username: '', password: '' });
       } else {
         setAuthError('Login failed. Please check your credentials.');
@@ -290,10 +349,12 @@ const App = () => {
     setIsAuthenticated(false);
     setUser(null);
     setShowLogin(true);
-    setShowAdminPanel(false);
+    setShowAdminModal(false);
     setDocuments([]);
     setSystemStatus({});
     setConnectionStatus('disconnected');
+    setMessageCount(0);
+    setShowQuickActions(true);
     setMessages([{
       type: 'bot',
       content: 'You have been logged out. Please login to continue using KG Hospital AI Assistant.',
@@ -306,7 +367,6 @@ const App = () => {
 
     const token = localStorage.getItem('access_token');
     
-    // Add user message
     const userMsg = {
       type: 'user',
       content: inputMessage,
@@ -314,9 +374,14 @@ const App = () => {
     };
     setMessages(prev => [...prev, userMsg]);
     
+    setMessageCount(prev => prev + 1);
+    
     const currentInput = inputMessage;
     setInputMessage('');
     setIsTyping(true);
+    
+    // Reset textarea height
+    setTimeout(() => autoResizeTextarea(), 0);
     
     try {
       const response = await api.sendMessage(currentInput, userRole, token);
@@ -356,6 +421,11 @@ const App = () => {
     }
   };
 
+  const handleInputChange = (e) => {
+    setInputMessage(e.target.value);
+    autoResizeTextarea();
+  };
+
   const loadDocuments = async (token) => {
     try {
       const response = await api.getDocuments(token);
@@ -376,30 +446,87 @@ const App = () => {
     }
   };
 
+  // File handling functions (same as before)...
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type === 'application/pdf') {
+        setUploadFile(file);
+      } else {
+        alert('Please select a PDF file only.');
+      }
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type === 'application/pdf') {
+        setUploadFile(file);
+      } else {
+        alert('Please select a PDF file only.');
+        e.target.value = '';
+      }
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setUploadFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const simulateUploadProgress = () => {
+    setUploadProgress(0);
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+    return interval;
+  };
+
   const handleFileUpload = async () => {
     if (!uploadFile || uploading) return;
     
     setUploading(true);
+    const progressInterval = simulateUploadProgress();
     const token = localStorage.getItem('access_token');
     
     try {
       const response = await api.uploadDocument(uploadFile, token);
       
-      // Show success message
       const successMsg = {
         type: 'bot',
-        content: `✅ Document "${uploadFile.name}" uploaded successfully! ${response.message}`,
+        content: `✅ Document "${uploadFile.name}" uploaded successfully! The AI model has been updated with this new information. ${response.message}`,
         timestamp: new Date().toLocaleTimeString()
       };
       setMessages(prev => [...prev, successMsg]);
       
-      // Reset file input
       setUploadFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       
-      // Reload documents and status
       await loadDocuments(token);
       await loadSystemStatus();
       
@@ -413,7 +540,9 @@ const App = () => {
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
+      clearInterval(progressInterval);
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -426,7 +555,7 @@ const App = () => {
       
       const successMsg = {
         type: 'bot',
-        content: `🔄 Documents reloaded successfully! ${response.message}`,
+        content: `🔄 Documents reloaded successfully! The AI model has been refreshed with all available documents. ${response.message}`,
         timestamp: new Date().toLocaleTimeString()
       };
       setMessages(prev => [...prev, successMsg]);
@@ -487,11 +616,12 @@ const App = () => {
 
   const handleQuickAction = (action) => {
     if (action === 'Upload Documents' && user?.role === 'admin') {
-      setShowAdminPanel(true);
+      setShowAdminModal(true);
       return;
     }
     if (action === 'System Status' && user?.role === 'admin') {
       loadSystemStatus();
+      setShowAdminModal(true);
       return;
     }
     if (action === 'Reload System' && user?.role === 'admin') {
@@ -499,6 +629,23 @@ const App = () => {
       return;
     }
     setInputMessage(action);
+    setMessageCount(prev => prev + 1);
+  };
+
+  const openAdminDashboard = () => {
+    setShowAdminModal(true);
+    if (user?.role === 'admin') {
+      loadDocuments(localStorage.getItem('access_token'));
+      loadSystemStatus();
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   // Connection status indicator
@@ -513,7 +660,279 @@ const App = () => {
     </div>
   );
 
-  // Login Screen
+  // Enhanced Upload Area Component (same as before)
+  const UploadArea = () => (
+    <div className="upload-section">
+      <h5>📤 Upload Document</h5>
+      
+      <div 
+        ref={uploadAreaRef}
+        className={`upload-area ${dragOver ? 'drag-over' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <span className="upload-icon">📁</span>
+        <div className="upload-text">
+          <h6>Drag & Drop PDF Files</h6>
+          <p>or click to browse files</p>
+          <button type="button" className="browse-button">
+            Browse Files
+          </button>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleFileSelect}
+        className="file-input"
+        disabled={uploading}
+      />
+
+      {uploadFile && (
+        <div className="selected-file">
+          <div className="file-info">
+            <div className="file-name">📄 {uploadFile.name}</div>
+            <div className="file-size">{formatFileSize(uploadFile.size)}</div>
+          </div>
+          <button 
+            onClick={removeSelectedFile}
+            className="remove-file"
+            disabled={uploading}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div className="upload-controls">
+        <button 
+          onClick={handleFileUpload}
+          disabled={!uploadFile || uploading}
+          className="upload-btn"
+        >
+          {uploading ? (
+            <>
+              <span className="loading-spinner"></span>
+              Uploading...
+            </>
+          ) : (
+            '📤 Upload PDF'
+          )}
+        </button>
+      </div>
+
+      {uploading && (
+        <div className="upload-progress">
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <div className="progress-text">
+            Uploading... {uploadProgress}%
+          </div>
+        </div>
+      )}
+
+      <p className="upload-hint">
+        Only PDF files are supported. Maximum size: 10MB
+      </p>
+    </div>
+  );
+
+  // Admin Dashboard Modal Component (same as before but with fixed visibility)
+  const AdminDashboardModal = () => {
+    if (!showAdminModal) return null;
+
+    return (
+      <div className="admin-modal-overlay">
+        <div className="admin-modal-container" ref={adminModalRef}>
+          <div className="admin-modal-header">
+            <div className="admin-modal-title">
+              <span className="admin-icon">🏥</span>
+              <div>
+                <h2>KG Hospital Admin Dashboard</h2>
+                <p>System Management & Document Control</p>
+              </div>
+            </div>
+            <button 
+              className="admin-modal-close"
+              onClick={() => setShowAdminModal(false)}
+              aria-label="Close Admin Dashboard"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div className="admin-modal-content">
+            <div className="admin-dashboard-grid">
+              {/* System Status Card */}
+              <div className="admin-card system-status-card">
+                <div className="admin-card-header">
+                  <h3>🔧 System Status</h3>
+                  <button 
+                    className="refresh-btn"
+                    onClick={loadSystemStatus}
+                    disabled={loading}
+                  >
+                    🔄
+                  </button>
+                </div>
+                <div className="status-metrics">
+                  <div className="status-metric">
+                    <div className="metric-icon">🔥</div>
+                    <div className="metric-info">
+                      <span className="metric-label">Firebase</span>
+                      <span className={`metric-value ${systemStatus.firebase_initialized ? 'success' : 'error'}`}>
+                        {systemStatus.firebase_initialized ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="status-metric">
+                    <div className="metric-icon">📄</div>
+                    <div className="metric-info">
+                      <span className="metric-label">Documents</span>
+                      <span className={`metric-value ${systemStatus.documents_loaded > 0 ? 'success' : 'warning'}`}>
+                        {systemStatus.documents_loaded || 0} loaded
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="status-metric">
+                    <div className="metric-icon">🗂️</div>
+                    <div className="metric-info">
+                      <span className="metric-label">Vector Store</span>
+                      <span className={`metric-value ${systemStatus.vectorstore_ready ? 'success' : 'error'}`}>
+                        {systemStatus.vectorstore_ready ? 'Ready' : 'Not Ready'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="status-metric">
+                    <div className="metric-icon">🤖</div>
+                    <div className="metric-info">
+                      <span className="metric-label">AI Chain</span>
+                      <span className={`metric-value ${systemStatus.conversation_chain_ready ? 'success' : 'error'}`}>
+                        {systemStatus.conversation_chain_ready ? 'Ready' : 'Not Ready'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Upload Card */}
+              <div className="admin-card upload-card">
+                <div className="admin-card-header">
+                  <h3>📤 Document Upload</h3>
+                </div>
+                <UploadArea />
+              </div>
+
+              {/* Documents Card */}
+              <div className="admin-card documents-card">
+                <div className="admin-card-header">
+                  <h3>📋 Document Library ({documents.length})</h3>
+                  <button 
+                    className="reload-btn"
+                    onClick={handleReloadDocuments}
+                    disabled={loading}
+                  >
+                    {loading ? '⏳' : '🔄'} Reload
+                  </button>
+                </div>
+                <div className="documents-grid">
+                  {documents.length === 0 ? (
+                    <div className="no-documents-placeholder">
+                      <div className="placeholder-icon">📭</div>
+                      <h4>No documents found</h4>
+                      <p>Upload PDF files to train the AI model</p>
+                    </div>
+                  ) : (
+                    documents.map((doc, index) => (
+                      <div key={index} className="document-card">
+                        <div className="doc-icon">📄</div>
+                        <div className="doc-details">
+                          <div className="doc-name">{doc.name}</div>
+                          <div className="doc-meta">
+                            <span className="doc-size">{formatFileSize(doc.size)}</span>
+                            <span className="doc-status">✅ {doc.status}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions Card */}
+              <div className="admin-card actions-card">
+                <div className="admin-card-header">
+                  <h3>⚡ Quick Actions</h3>
+                </div>
+                <div className="admin-actions-grid">
+                  <button 
+                    className="admin-action-btn system-btn"
+                    onClick={loadSystemStatus}
+                  >
+                    <span className="action-icon">📊</span>
+                    <span>System Status</span>
+                  </button>
+                  
+                  <button 
+                    className="admin-action-btn upload-btn-action"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <span className="action-icon">📤</span>
+                    <span>Upload File</span>
+                  </button>
+                  
+                  <button 
+                    className="admin-action-btn reload-btn-action"
+                    onClick={handleReloadDocuments}
+                    disabled={loading}
+                  >
+                    <span className="action-icon">🔄</span>
+                    <span>Reload Docs</span>
+                  </button>
+                  
+                  <button 
+                    className="admin-action-btn analytics-btn"
+                    onClick={() => console.log('Analytics clicked')}
+                  >
+                    <span className="action-icon">📈</span>
+                    <span>Analytics</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="admin-modal-footer">
+            <div className="footer-info">
+              <span>KG Hospital Admin Dashboard v1.0</span>
+              <span>Last updated: {new Date().toLocaleString()}</span>
+            </div>
+            <div className="footer-actions">
+              <button 
+                className="footer-btn secondary"
+                onClick={() => setShowAdminModal(false)}
+              >
+                Close Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Login Screen (same as before)
   if (showLogin) {
     return (
       <div className="login-container">
@@ -564,7 +983,14 @@ const App = () => {
               className="login-button"
               disabled={loading || connectionStatus === 'error'}
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
             </button>
           </form>
           
@@ -586,229 +1012,136 @@ const App = () => {
     );
   }
 
-  // Main Chat Interface
+  // Main Chat Interface with all fixes
   return (
-    <div className="chatbot-container">
-      {/* Header */}
-      <div className="chatbot-header">
-        <div className="header-content">
-          <div className="hospital-logo">
-            <div className="logo-icon">KG</div>
-            <div className="logo-text">
-              <h3>Hospital AI Assistant</h3>
-              <p>24/7 Healthcare Support</p>
+    <>
+      <div className="chatbot-container" ref={chatContainerRef}>
+        {/* Fixed Header */}
+        <div className="chatbot-header fixed-header">
+          <div className="header-content responsive">
+            <div className="hospital-logo">
+              <div className="logo-icon">KG</div>
+              <div className="logo-text">
+                <h3>Hospital AI Assistant</h3>
+                <p className="white-subtitle">24/7 Healthcare Support</p>
+              </div>
             </div>
-          </div>
-          <div className="header-controls">
-            <ConnectionStatus />
-            <div className="user-info">
-              <span className="user-name">{user?.username}</span>
-              <span className="user-role">{user?.role}</span>
-            </div>
-            {user?.role === 'admin' && (
-              <button 
-                className={`admin-panel-btn ${showAdminPanel ? 'active' : ''}`}
-                onClick={() => setShowAdminPanel(!showAdminPanel)}
-              >
-                📊 Admin
+            <div className="header-controls responsive">
+              <ConnectionStatus />
+              <div className="user-info">
+                <span className="user-name">{user?.username}</span>
+                <span className="user-role">{user?.role}</span>
+              </div>
+              {(user?.role === 'admin' || user?.role === 'staff') && (
+                <button 
+                  className="admin-panel-btn visible"
+                  onClick={openAdminDashboard}
+                >
+                  📊 {user?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+                </button>
+              )}
+              <button className="logout-btn" onClick={handleLogout}>
+                Logout
               </button>
-            )}
-            <button className="logout-btn" onClick={handleLogout}>
-              Logout
-            </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Admin Panel */}
-      {user?.role === 'admin' && showAdminPanel && (
-        <div className="admin-panel">
-          <div className="admin-header">
-            <h4>📊 Admin Dashboard</h4>
-            <button 
-              className="close-admin-btn"
-              onClick={() => setShowAdminPanel(false)}
-            >
-              ✕
-            </button>
-          </div>
+        {/* Enlarged Chat Messages with proper spacing */}
+        <div className="chat-messages enlarged fixed-spacing">
+          {messages.map((message, index) => (
+            <div key={index} className={`message ${message.type}`}>
+              <div className="message-content">
+                {message.content}
+              </div>
+              <div className="message-time">
+                {message.timestamp}
+              </div>
+            </div>
+          ))}
           
-          <div className="admin-content">
-            {/* System Status */}
-            <div className="status-section">
-              <h5>🔧 System Status</h5>
-              <div className="status-grid">
-                <div className="status-item">
-                  <span className="status-label">Firebase:</span>
-                  <span className={`status-value ${systemStatus.firebase_initialized ? 'success' : 'error'}`}>
-                    {systemStatus.firebase_initialized ? '✅ Connected' : '❌ Disconnected'}
-                  </span>
+          {isTyping && (
+            <div className="message bot typing">
+              <div className="message-content">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
                 </div>
-                <div className="status-item">
-                  <span className="status-label">Documents:</span>
-                  <span className={`status-value ${systemStatus.documents_loaded > 0 ? 'success' : 'warning'}`}>
-                    📄 {systemStatus.documents_loaded || 0} loaded
-                  </span>
-                </div>
-                <div className="status-item">
-                  <span className="status-label">Vector Store:</span>
-                  <span className={`status-value ${systemStatus.vectorstore_ready ? 'success' : 'error'}`}>
-                    {systemStatus.vectorstore_ready ? '✅ Ready' : '❌ Not Ready'}
-                  </span>
-                </div>
-                <div className="status-item">
-                  <span className="status-label">AI Chain:</span>
-                  <span className={`status-value ${systemStatus.conversation_chain_ready ? 'success' : 'error'}`}>
-                    {systemStatus.conversation_chain_ready ? '✅ Ready' : '❌ Not Ready'}
-                  </span>
-                </div>
-              </div>
-              <button 
-                className="refresh-status-btn"
-                onClick={loadSystemStatus}
-                disabled={loading}
-              >
-                🔄 {loading ? 'Refreshing...' : 'Refresh Status'}
-              </button>
-            </div>
-            
-            {/* Upload Section */}
-            <div className="upload-section">
-              <h5>📤 Upload Document</h5>
-              <div className="upload-controls">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="file-input"
-                  disabled={uploading}
-                />
-                <button 
-                  onClick={handleFileUpload}
-                  disabled={!uploadFile || uploading}
-                  className="upload-btn"
-                >
-                  {uploading ? '⏳ Uploading...' : '📤 Upload PDF'}
-                </button>
-              </div>
-              <p className="upload-hint">Only PDF files are supported. Max size: 10MB</p>
-            </div>
-            
-            {/* Documents Section */}
-            <div className="documents-section">
-              <div className="documents-header">
-                <h5>📋 Documents ({documents.length})</h5>
-                <button 
-                  className="reload-docs-btn"
-                  onClick={handleReloadDocuments}
-                  disabled={loading}
-                >
-                  🔄 {loading ? 'Reloading...' : 'Reload All'}
-                </button>
-              </div>
-              <div className="documents-list">
-                {documents.length === 0 ? (
-                  <div className="no-documents">
-                    📭 No documents found. Upload some PDFs to get started!
-                  </div>
-                ) : (
-                  documents.map((doc, index) => (
-                    <div key={index} className="document-item">
-                      <span className="doc-name" title={doc.name}>{doc.name}</span>
-                      <span className="doc-size">{(doc.size / 1024 / 1024).toFixed(1)}MB</span>
-                      <span className="doc-status">✅ {doc.status}</span>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
-          </div>
+          )}
+          
+          <div ref={messagesEndRef} />
         </div>
-      )}
 
-      {/* Chat Messages */}
-      <div className="chat-messages">
-        {messages.map((message, index) => (
-          <div key={index} className={`message ${message.type}`}>
-            <div className="message-content">
-              {message.content}
-            </div>
-            <div className="message-time">
-              {message.timestamp}
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-          <div className="message bot typing">
-            <div className="message-content">
-              <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+        {/* Conditional Quick Actions */}
+        {showQuickActions && (
+          <div className="quick-actions fade-in">
+            <div className="quick-actions-header">
+              <h4>Quick Actions for {userRole.charAt(0).toUpperCase() + userRole.slice(1)}s:</h4>
+              <div className="message-counter">
+                Messages: {messageCount}/3
               </div>
+            </div>
+            <div className="action-buttons">
+              {quickActions[userRole]?.map((action, index) => (
+                <button 
+                  key={index} 
+                  className="action-btn"
+                  onClick={() => handleQuickAction(action)}
+                  disabled={!isAuthenticated}
+                >
+                  {action}
+                </button>
+              ))}
             </div>
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h4>Quick Actions for {userRole.charAt(0).toUpperCase() + userRole.slice(1)}s:</h4>
-        <div className="action-buttons">
-          {quickActions[userRole]?.map((action, index) => (
+        {/* Fixed Input Area */}
+        <div className="chat-input simplified fixed-bottom">
+          <div className="input-container">
+            <textarea
+              value={inputMessage}
+              onChange={handleInputChange}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message here..."
+              className="message-input auto-resize"
+              disabled={!isAuthenticated || isTyping}
+              rows={1}
+            />
             <button 
-              key={index} 
-              className="action-btn"
-              onClick={() => handleQuickAction(action)}
-              disabled={!isAuthenticated}
+              onClick={handleSendMessage} 
+              className="send-button"
+              disabled={!isAuthenticated || !inputMessage.trim() || isTyping}
             >
-              {action}
+              {isTyping ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  Sending...
+                </>
+              ) : (
+                'Send'
+              )}
             </button>
-          ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="chatbot-footer">
+          <p>KG Hospital - Advanced Healthcare Since 1974</p>
+          <div className="footer-links">
+            <a href="#privacy">Privacy Policy</a>
+            <a href="#terms">Terms of Service</a>
+            <a href="#contact">Contact Us</a>
+          </div>
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="chat-input">
-        <div className="input-container">
-          <textarea
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message here..."
-            className="message-input"
-            disabled={!isAuthenticated || isTyping}
-            rows={1}
-          />
-          <button 
-            onClick={handleSendMessage} 
-            className="send-button"
-            disabled={!isAuthenticated || !inputMessage.trim() || isTyping}
-          >
-            {isTyping ? 'Sending...' : 'Send'}
-          </button>
-        </div>
-        <div className="input-features">
-          <button className="feature-btn" disabled={!isAuthenticated}>🎤 Voice</button>
-          <button className="feature-btn" disabled={!isAuthenticated}>📎 Attach</button>
-          <button className="feature-btn emergency" disabled={!isAuthenticated}>🚨 Emergency</button>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="chatbot-footer">
-        <p>KG Hospital - Advanced Healthcare Since 1974</p>
-        <div className="footer-links">
-          <a href="#privacy">Privacy Policy</a>
-          <a href="#terms">Terms of Service</a>
-          <a href="#contact">Contact Us</a>
-        </div>
-      </div>
-    </div>
+      {/* Separate Admin Dashboard Modal */}
+      <AdminDashboardModal />
+    </>
   );
 };
 
