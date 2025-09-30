@@ -2,12 +2,347 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>KG Hospital AI Assistant - 24/7 Healthcare Support</title>
+    <meta name="title" content="KG Hospital AI Assistant - 24/7 Healthcare Support" />
+    <meta name="description" content="Intelligent AI-powered healthcare assistant providing instant support, appointment booking, doctor consultations, and medical information for KG Hospital patients and visitors." />
+    <meta name="keywords" content="KG Hospital, AI Assistant, Healthcare, Medical Support, Appointment Booking, Doctor Consultation, Hospital AI, Healthcare Chatbot" />
+    <meta name="author" content="KG Hospital" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kg-hospital-ai.vercel.app/" />
+    <meta property="og:title" content="KG Hospital AI Assistant - 24/7 Healthcare Support" />
+    <meta property="og:description" content="Intelligent AI-powered healthcare assistant providing instant support, appointment booking, doctor consultations, and medical information." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:site_name" content="KG Hospital AI Assistant" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://kg-hospital-ai.vercel.app/" />
+    <meta property="twitter:title" content="KG Hospital AI Assistant - 24/7 Healthcare Support" />
+    <meta property="twitter:description" content="Intelligent AI-powered healthcare assistant providing instant support, appointment booking, doctor consultations, and medical information." />
+    <meta property="twitter:image" content="/twitter-card.png" />
+    
+    <!-- Favicon and App Icons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#2E4AC7" />
+    <meta name="msapplication-TileColor" content="#2E4AC7" />
+    <meta name="msapplication-navbutton-color" content="#2E4AC7" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="KG Hospital AI" />
+    <meta name="application-name" content="KG Hospital AI Assistant" />
+    
+    <!-- Performance & Loading -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MedicalOrganization",
+      "name": "KG Hospital AI Assistant",
+      "description": "AI-powered healthcare assistant providing 24/7 medical support and hospital services",
+      "url": "https://kg-hospital-ai.vercel.app/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://kg-hospital-ai.vercel.app/logo.png"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+91-XXXX-XXXX",
+        "contactType": "customer service",
+        "availableLanguage": ["English", "Hindi"]
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "KG Hospital Complex",
+        "addressLocality": "Your City",
+        "addressRegion": "Your State",
+        "postalCode": "XXXXXX",
+        "addressCountry": "IN"
+      },
+      "sameAs": [
+        "https://facebook.com/kghospital",
+        "https://twitter.com/kghospital",
+        "https://instagram.com/kghospital"
+      ]
+    }
+    </script>
+    
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://your-backend-api.onrender.com;" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    
+    <!-- Loading Styles -->
+    <style>
+      /* Critical CSS for loading */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', sans-serif;
+        background: linear-gradient(135deg, #f0f8ff 0%, #e8f4ff 100%);
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      
+      /* Loading Screen */
+      .loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        color: white;
+        font-family: 'Inter', sans-serif;
+      }
+      
+      .loading-logo {
+        width: 120px;
+        height: 120px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 48px;
+        font-weight: 800;
+        margin-bottom: 30px;
+        animation: logoFloat 2s ease-in-out infinite alternate;
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+      }
+      
+      .loading-text {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 15px;
+        text-align: center;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      
+      .loading-subtitle {
+        font-size: 16px;
+        opacity: 0.9;
+        margin-bottom: 40px;
+        text-align: center;
+        font-weight: 500;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        border-top-color: #ffffff;
+        animation: spin 1s linear infinite;
+        margin-bottom: 30px;
+      }
+      
+      .loading-progress {
+        width: 300px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      
+      .loading-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #FF8C00, #FFA500);
+        border-radius: 2px;
+        animation: progressFill 2s ease-in-out infinite;
+      }
+      
+      .loading-status {
+        font-size: 14px;
+        opacity: 0.8;
+        text-align: center;
+        font-weight: 500;
+      }
+      
+      @keyframes logoFloat {
+        0% { transform: translateY(0px); }
+        100% { transform: translateY(-10px); }
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @keyframes progressFill {
+        0% { width: 0%; }
+        50% { width: 70%; }
+        100% { width: 100%; }
+      }
+      
+      /* Hide loading screen when app loads */
+      .app-loaded .loading-screen {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease-out;
+      }
+      
+      /* App Container */
+      #root {
+        min-height: 100vh;
+        opacity: 0;
+        transition: opacity 0.5s ease-in;
+      }
+      
+      .app-loaded #root {
+        opacity: 1;
+      }
+      
+      /* Error Fallback */
+      .error-fallback {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        text-align: center;
+        padding: 50px 20px;
+        z-index: 10000;
+      }
+      
+      .error-fallback.show {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+      <div class="loading-logo">KG</div>
+      <div class="loading-text">KG Hospital AI Assistant</div>
+      <div class="loading-subtitle">Initializing Healthcare Support System</div>
+      <div class="loading-spinner"></div>
+      <div class="loading-progress">
+        <div class="loading-progress-fill"></div>
+      </div>
+      <div class="loading-status" id="loadingStatus">Loading application...</div>
+    </div>
+    
+    <!-- Error Fallback -->
+    <div class="error-fallback" id="errorFallback">
+      <h1>⚕️ Service Temporarily Unavailable</h1>
+      <p>Our AI Assistant is currently offline. Please try refreshing the page or contact hospital support.</p>
+      <button onclick="location.reload()" style="padding: 12px 24px; margin-top: 20px; background: white; color: #dc3545; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Retry</button>
+    </div>
+    
+    <!-- Main Application -->
+    <div id="root" role="main"></div>
+    
+    <!-- Loading Script -->
+    <script>
+      // Loading status messages
+      const loadingMessages = [
+        "Loading application...",
+        "Connecting to AI services...",
+        "Preparing healthcare assistant...",
+        "Almost ready..."
+      ];
+      
+      let messageIndex = 0;
+      const loadingStatus = document.getElementById('loadingStatus');
+      
+      // Update loading messages
+      const updateLoadingMessage = () => {
+        if (loadingStatus && messageIndex < loadingMessages.length) {
+          loadingStatus.textContent = loadingMessages[messageIndex];
+          messageIndex++;
+          setTimeout(updateLoadingMessage, 800);
+        }
+      };
+      
+      // Start loading messages
+      setTimeout(updateLoadingMessage, 800);
+      
+      // Hide loading screen when app loads
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          document.body.classList.add('app-loaded');
+        }, 1500);
+      });
+      
+      // Error handling
+      window.addEventListener('error', (e) => {
+        console.error('Application error:', e);
+        setTimeout(() => {
+          document.getElementById('errorFallback').classList.add('show');
+          document.getElementById('loadingScreen').style.display = 'none';
+        }, 3000);
+      });
+      
+      // Service Worker Registration for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+    
+    <!-- React App Module -->
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Analytics (Optional - Add your analytics code) -->
+    <!-- 
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'GA_MEASUREMENT_ID');
+    </script>
+    -->
   </body>
 </html>
