@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://hospital-chat-bot-backend.onrender.com';
 
 const App = () => {
   // State management (same as before)
