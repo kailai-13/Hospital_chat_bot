@@ -9,3 +9,26 @@ faiss-cpu>=1.7.3
 transformers==4.43.3
 sentence-transformers==3.0.1
 nltk==3.8.1
+# PDF Processing and AI Chatbot Requirements for Python 3.13
+
+# Core utilities
+python-dotenv==1.0.1
+
+# AI and ML libraries
+streamlit
+langchain-community
+langchain-text-splitters
+langchain-groq
+faiss-cpu
+transformers
+sentence-transformers
+nltk
+
+# PDF Processing libraries
+PyPDF2==3.0.1
+pymupdf==1.24.13
+unstructured[pdf]
+Pillow
+
+# Firebase
+firebase-admin
