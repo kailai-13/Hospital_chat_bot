@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Nothing OS Style Icon Components
+// Nothing OS Style Icon Components (unchanged)
 const Icons = {
   Hospital: () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -95,18 +95,18 @@ const Icons = {
       width: '8px',
       height: '8px',
       borderRadius: '50%',
-      background: status === 'success' ? '#10b981' : 
-                  status === 'error' ? '#ef4444' : 
-                  status === 'warning' ? '#f59e0b' : '#6b7280',
+      background: status === 'success' ? '#28a745' : 
+                  status === 'error' ? '#dc3545' : 
+                  status === 'warning' ? '#ffc107' : '#6c757d',
       position: 'relative'
     }}>
       <div style={{
         width: '12px',
         height: '12px',
         borderRadius: '50%',
-        border: `2px solid ${status === 'success' ? '#10b981' : 
-                              status === 'error' ? '#ef4444' : 
-                              status === 'warning' ? '#f59e0b' : '#6b7280'}`,
+        border: `2px solid ${status === 'success' ? '#28a745' : 
+                              status === 'error' ? '#dc3545' : 
+                              status === 'warning' ? '#ffc107' : '#6c757d'}`,
         position: 'absolute',
         top: '-4px',
         left: '-4px',
@@ -540,12 +540,11 @@ const App = () => {
     }
   };
 
-  // Updated quickActions without Analytics Dashboard
   const quickActions = {
     patient: ['Find a Doctor', 'Book Appointment', 'Emergency Contact', 'Treatment Information'],
     visitor: ['Visiting Hours', 'Hospital Location', 'Parking Information', 'Amenities'],
     staff: ['Patient Inquiry', 'Department Info', 'Emergency Protocols', 'Hospital Policies'],
-    admin: ['System Status', 'Upload Documents', 'Reload System'] // Removed 'Analytics Dashboard'
+    admin: ['System Status', 'Upload Documents', 'Reload System']
   };
 
   const handleQuickAction = (action) => {
@@ -939,13 +938,14 @@ const App = () => {
   );
 };
 
+// Updated color scheme to match your CSS
 const styles = {
   loginContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     padding: '20px'
   },
   loginCard: {
@@ -965,7 +965,7 @@ const styles = {
   logoIcon: {
     width: '60px',
     height: '60px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     borderRadius: '15px',
     display: 'flex',
     alignItems: 'center',
@@ -977,7 +977,7 @@ const styles = {
   logoIconSmall: {
     width: '45px',
     height: '45px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -1037,12 +1037,13 @@ const styles = {
   },
   loginInput: {
     padding: '16px',
-    border: '2px solid #e2e8f0',
+    border: '2px solid #e8f1ff', // Changed
     borderRadius: '12px',
     fontSize: '16px',
     transition: 'all 0.3s',
     outline: 'none',
-    fontFamily: 'inherit'
+    fontFamily: 'inherit',
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
   },
   authError: {
     padding: '12px 16px',
@@ -1056,7 +1057,7 @@ const styles = {
   },
   loginButton: {
     padding: '16px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -1096,7 +1097,7 @@ const styles = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   },
   chatbotHeader: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     color: 'white',
     padding: '20px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
@@ -1156,7 +1157,7 @@ const styles = {
     padding: '10px 16px',
     background: 'rgba(255,255,255,0.9)',
     border: 'none',
-    color: '#764ba2',
+    color: '#1F3A9E', // Changed
     borderRadius: '10px',
     cursor: 'pointer',
     fontSize: '14px',
@@ -1172,7 +1173,8 @@ const styles = {
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px'
+    gap: '15px',
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
   },
   message: {
     maxWidth: '70%',
@@ -1183,15 +1185,15 @@ const styles = {
   },
   messageUser: {
     alignSelf: 'flex-end',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
     color: 'white'
   },
   messageBot: {
     alignSelf: 'flex-start',
-    background: 'white',
-    color: '#2d3748',
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
+    color: '#1F3A9E', // Changed
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    border: '1px solid #f0f0f0'
+    border: '1px solid #d1e4ff' // Changed
   },
   messageContent: {
     fontSize: '15px',
@@ -1211,13 +1213,13 @@ const styles = {
     width: '8px',
     height: '8px',
     borderRadius: '50%',
-    background: '#667eea',
+    background: '#2E4AC7', // Changed
     animation: 'bounce 1.4s infinite ease-in-out'
   },
   quickActions: {
     padding: '20px',
-    background: 'white',
-    borderTop: '1px solid #e2e8f0',
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
+    borderTop: '1px solid #d1e4ff', // Changed
     animation: 'slideUp 0.4s ease-out'
   },
   quickActionsHeader: {
@@ -1229,16 +1231,16 @@ const styles = {
   quickActionsTitle: {
     margin: 0,
     fontSize: '16px',
-    color: '#2d3748',
+    color: '#1F3A9E', // Changed
     fontWeight: '600'
   },
   messageCounter: {
     fontSize: '13px',
     color: '#718096',
     padding: '6px 12px',
-    background: '#f7fafc',
+    background: 'rgba(255, 140, 0, 0.1)', // Changed
     borderRadius: '12px',
-    border: '1px solid #e2e8f0'
+    border: '1px solid rgba(255, 140, 0, 0.2)' // Changed
   },
   actionButtons: {
     display: 'flex',
@@ -1247,7 +1249,7 @@ const styles = {
   },
   actionBtn: {
     padding: '12px 18px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
     color: 'white',
     border: 'none',
     borderRadius: '10px',
@@ -1256,30 +1258,31 @@ const styles = {
     fontWeight: '500',
     transition: 'all 0.3s',
     whiteSpace: 'nowrap',
-    boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)'
+    boxShadow: '0 2px 4px rgba(46, 74, 199, 0.3)' // Changed
   },
   chatInput: {
     display: 'flex',
     gap: '12px',
     padding: '20px',
     background: 'white',
-    borderTop: '1px solid #e2e8f0'
+    borderTop: '1px solid #e8f1ff' // Changed
   },
   messageInput: {
     flex: 1,
     padding: '14px 18px',
-    border: '2px solid #e2e8f0',
+    border: '2px solid #d1e4ff', // Changed
     borderRadius: '16px',
     fontSize: '15px',
     resize: 'none',
     outline: 'none',
     fontFamily: 'inherit',
     maxHeight: '120px',
-    transition: 'border-color 0.3s'
+    transition: 'border-color 0.3s',
+    background: 'linear-gradient(135deg, #fafcff 0%, #f8fafe 100%)' // Changed
   },
   sendButton: {
     padding: '14px 24px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
     color: 'white',
     border: 'none',
     borderRadius: '16px',
@@ -1320,7 +1323,7 @@ const styles = {
     animation: 'fadeIn 0.3s ease-in'
   },
   modalContainer: {
-    background: 'white',
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)', // Changed
     borderRadius: '20px',
     width: '100%',
     maxWidth: '900px',
@@ -1335,23 +1338,27 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '25px 30px',
-    borderBottom: '1px solid #e2e8f0'
+    borderBottom: '1px solid #e2e8f0',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    color: 'white',
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px'
   },
   modalTitle: {
     margin: 0,
     fontSize: '24px',
-    color: '#2d3748',
+    color: 'white', // Changed
     fontWeight: '600'
   },
   modalClose: {
     width: '44px',
     height: '44px',
     border: 'none',
-    background: '#f7fafc',
+    background: 'rgba(255,255,255,0.2)', // Changed
     borderRadius: '12px',
     cursor: 'pointer',
     fontSize: '20px',
-    color: '#4b5563',
+    color: 'white', // Changed
     transition: 'all 0.3s',
     display: 'flex',
     alignItems: 'center',
@@ -1363,18 +1370,19 @@ const styles = {
     padding: '30px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px'
+    gap: '24px',
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
   },
   adminCard: {
-    background: '#f7fafc',
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)', // Changed
     borderRadius: '16px',
     padding: '28px',
-    border: '1px solid #e2e8f0'
+    border: '1px solid #e8f1ff' // Changed
   },
   cardTitle: {
     margin: '0 0 20px 0',
     fontSize: '18px',
-    color: '#2d3748',
+    color: '#1F3A9E', // Changed
     fontWeight: '600'
   },
   cardHeader: {
@@ -1393,30 +1401,30 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'white',
+    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)', // Changed
     borderRadius: '12px',
     fontSize: '14px',
-    border: '1px solid #e2e8f0'
+    border: '1px solid #e8f1ff' // Changed
   },
   statusSuccess: {
-    color: '#059669',
+    color: '#28a745', // Green from CSS
     fontWeight: '600'
   },
   statusError: {
-    color: '#dc2626',
+    color: '#dc3545', // Red from CSS
     fontWeight: '600'
   },
   uploadArea: {
-    border: '2px dashed #cbd5e0',
+    border: '2px dashed #d1e4ff', // Changed
     borderRadius: '16px',
     padding: '48px 24px',
     textAlign: 'center',
     cursor: 'pointer',
     transition: 'all 0.3s',
-    background: 'white'
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
   },
   uploadAreaDragOver: {
-    borderColor: '#667eea',
+    borderColor: '#2E4AC7', // Changed
     background: '#eef2ff'
   },
   uploadText: {
@@ -1433,10 +1441,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'white',
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
     borderRadius: '12px',
     marginTop: '16px',
-    border: '1px solid #e2e8f0'
+    border: '1px solid #d1e4ff' // Changed
   },
   removeFileBtn: {
     width: '32px',
@@ -1456,7 +1464,7 @@ const styles = {
   uploadBtn: {
     width: '100%',
     padding: '14px 20px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -1477,19 +1485,19 @@ const styles = {
   progressBar: {
     width: '100%',
     height: '8px',
-    background: '#e2e8f0',
+    background: '#e8f1ff', // Changed
     borderRadius: '4px',
     marginTop: '16px',
     overflow: 'hidden'
   },
   progressFill: {
     height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(90deg, #FF8C00, #FFA500)', // Changed
     transition: 'width 0.3s ease-in-out'
   },
   reloadBtn: {
     padding: '10px 16px',
-    background: '#667eea',
+    background: '#28a745', // Changed to green from CSS
     color: 'white',
     border: 'none',
     borderRadius: '10px',
@@ -1519,9 +1527,9 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'white',
+    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)', // Changed
     borderRadius: '12px',
-    border: '1px solid #e2e8f0'
+    border: '1px solid #e8f1ff' // Changed
   },
   docSize: {
     fontSize: '12px',
@@ -1553,15 +1561,14 @@ styleSheet.textContent = `
     100% { transform: rotate(360deg); }
   }
   
-  /* Hover effects */
   .login-button:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(46, 74, 199, 0.4);
   }
   
   .action-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(46, 74, 199, 0.4);
   }
   
   .admin-panel-btn:hover {
@@ -1573,7 +1580,7 @@ styleSheet.textContent = `
   }
   
   .modal-close:hover {
-    background: #e2e8f0;
+    background: rgba(255,255,255,0.3);
   }
   
   .remove-file-btn:hover {
@@ -1581,7 +1588,7 @@ styleSheet.textContent = `
   }
   
   .reload-btn:hover {
-    background: #5a67d8;
+    background: #20c997;
   }
   
   @media (max-width: 768px) {
