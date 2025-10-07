@@ -25,3 +25,8 @@ sentence-transformers==2.2.2
 # Document Processing
 pypdf2==3.0.1
 requests==2.31.0
+pypdf
+unstructured
+sentence-transformers==2.2.2
+huggingface-hub==0.19.4
+pdfminer.six
