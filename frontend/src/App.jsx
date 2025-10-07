@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000'; // Adjust as needed
 
-// Nothing OS Style Icon Components (unchanged)
+// Icons Component (keeping same as original)
 const Icons = {
   Hospital: () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -71,13 +71,6 @@ const Icons = {
     </svg>
   ),
 
-  User: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
-    </svg>
-  ),
-
   Close: () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
       <path d="M18 6L6 18M6 6l12 12"/>
@@ -137,13 +130,6 @@ const Icons = {
       <path d="M3 3v18h18"/>
       <path d="M7 12l4-4 4 4 4-4"/>
     </svg>
-  ),
-
-  Logout: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-      <path d="M16 17l5-5-5-5M21 12H9"/>
-    </svg>
   )
 };
 
@@ -152,11 +138,6 @@ const App = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [userRole, setUserRole] = useState('patient');
   const [isTyping, setIsTyping] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(true);
-  const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '' });
-  const [authError, setAuthError] = useState('');
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [uploadFile, setUploadFile] = useState(null);
@@ -168,6 +149,7 @@ const App = () => {
   const [dragOver, setDragOver] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
+  const [showRoleSelector, setShowRoleSelector] = useState(true);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -188,34 +170,10 @@ const App = () => {
   }, [messageCount]);
 
   const api = {
-    login: async (credentials) => {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Login failed');
-      }
-      return await response.json();
-    },
-
-    verifyAuth: async (token) => {
-      const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Token verification failed');
-      return await response.json();
-    },
-
-    sendMessage: async (message, userRole, token) => {
+    sendMessage: async (message, userRole) => {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, user_role: userRole })
       });
       if (!response.ok) {
@@ -225,12 +183,11 @@ const App = () => {
       return await response.json();
     },
 
-    uploadDocument: async (file, token) => {
+    uploadDocument: async (file) => {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await fetch(`${API_BASE_URL}/admin/upload-document`, {
+      const response = await fetch(`${API_BASE_URL}/upload-document`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
       if (!response.ok) {
@@ -240,18 +197,15 @@ const App = () => {
       return await response.json();
     },
 
-    getDocuments: async (token) => {
-      const response = await fetch(`${API_BASE_URL}/admin/documents`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+    getDocuments: async () => {
+      const response = await fetch(`${API_BASE_URL}/documents`);
       if (!response.ok) throw new Error('Failed to fetch documents');
       return await response.json();
     },
 
-    reloadDocuments: async (token) => {
-      const response = await fetch(`${API_BASE_URL}/admin/reload-documents`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+    reloadDocuments: async () => {
+      const response = await fetch(`${API_BASE_URL}/reload-documents`, {
+        method: 'POST'
       });
       if (!response.ok) throw new Error('Failed to reload documents');
       return await response.json();
@@ -265,12 +219,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      verifyAuth(token);
-    } else {
-      setConnectionStatus('disconnected');
-    }
     testBackendConnection();
   }, []);
 
@@ -287,81 +235,19 @@ const App = () => {
     }
   };
 
-  const verifyAuth = async (token) => {
-    try {
-      setLoading(true);
-      const userData = await api.verifyAuth(token);
-      setUser(userData);
-      setUserRole(userData.role);
-      setIsAuthenticated(true);
-      setShowLogin(false);
-      setConnectionStatus('authenticated');
-      setMessageCount(0);
-      setShowQuickActions(true);
-      
-      setMessages([{
-        type: 'bot',
-        content: `Welcome ${userData.username}! You are logged in as ${userData.role}. How can I help you today?`,
-        timestamp: new Date().toLocaleTimeString()
-      }]);
-      
-      if (userData.role === 'admin') {
-        await loadDocuments(token);
-        await loadSystemStatus();
-      }
-      setAuthError('');
-    } catch (error) {
-      localStorage.removeItem('access_token');
-      setIsAuthenticated(false);
-      setShowLogin(true);
-      setConnectionStatus('disconnected');
-      setAuthError('Session expired. Please login again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    setLoading(true);
-    
-    try {
-      const response = await api.login(loginCredentials);
-      if (response.access_token) {
-        localStorage.setItem('access_token', response.access_token);
-        await verifyAuth(response.access_token);
-        setLoginCredentials({ username: '', password: '' });
-      }
-    } catch (error) {
-      setAuthError(error.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    setIsAuthenticated(false);
-    setUser(null);
-    setShowLogin(true);
-    setShowAdminModal(false);
-    setDocuments([]);
-    setSystemStatus({});
-    setConnectionStatus('disconnected');
-    setMessageCount(0);
-    setShowQuickActions(true);
+  const handleRoleSelection = (role) => {
+    setUserRole(role);
+    setShowRoleSelector(false);
     setMessages([{
       type: 'bot',
-      content: 'You have been logged out.',
+      content: `Welcome! You are accessing as a ${role}. How can I help you today?`,
       timestamp: new Date().toLocaleTimeString()
     }]);
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !isAuthenticated || isTyping) return;
+    if (!inputMessage.trim() || isTyping) return;
 
-    const token = localStorage.getItem('access_token');
     const userMsg = {
       type: 'user',
       content: inputMessage,
@@ -376,7 +262,7 @@ const App = () => {
     setIsTyping(true);
     
     try {
-      const response = await api.sendMessage(currentInput, userRole, token);
+      const response = await api.sendMessage(currentInput, userRole);
       const botMsg = {
         type: 'bot',
         content: response.response || 'No response generated.',
@@ -384,14 +270,9 @@ const App = () => {
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
-      let errorMessage = 'Sorry, I encountered an error. Please try again.';
-      if (error.message.includes('401')) {
-        errorMessage = 'Session expired. Please login again.';
-        handleLogout();
-      }
       setMessages(prev => [...prev, {
         type: 'bot',
-        content: errorMessage,
+        content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date().toLocaleTimeString()
       }]);
     } finally {
@@ -399,9 +280,9 @@ const App = () => {
     }
   };
 
-  const loadDocuments = async (token) => {
+  const loadDocuments = async () => {
     try {
-      const response = await api.getDocuments(token);
+      const response = await api.getDocuments();
       setDocuments(response.documents || []);
     } catch (error) {
       console.error('Failed to load documents:', error);
@@ -458,10 +339,8 @@ const App = () => {
       });
     }, 200);
     
-    const token = localStorage.getItem('access_token');
-    
     try {
-      const response = await api.uploadDocument(uploadFile, token);
+      const response = await api.uploadDocument(uploadFile);
       
       setUploadProgress(100);
       
@@ -481,7 +360,7 @@ const App = () => {
         fileInputRef.current.value = '';
       }
       
-      await loadDocuments(token);
+      await loadDocuments();
       await loadSystemStatus();
       
     } catch (error) {
@@ -507,11 +386,10 @@ const App = () => {
   };
 
   const handleReloadDocuments = async () => {
-    const token = localStorage.getItem('access_token');
     setLoading(true);
     
     try {
-      await api.reloadDocuments(token);
+      await api.reloadDocuments();
       setMessages(prev => [...prev, {
         type: 'bot',
         content: (
@@ -522,7 +400,7 @@ const App = () => {
         ),
         timestamp: new Date().toLocaleTimeString()
       }]);
-      await loadDocuments(token);
+      await loadDocuments();
       await loadSystemStatus();
     } catch (error) {
       setMessages(prev => [...prev, {
@@ -548,16 +426,16 @@ const App = () => {
   };
 
   const handleQuickAction = (action) => {
-    if (action === 'Upload Documents' && user?.role === 'admin') {
+    if (action === 'Upload Documents') {
       setShowAdminModal(true);
       return;
     }
-    if (action === 'System Status' && user?.role === 'admin') {
+    if (action === 'System Status') {
       loadSystemStatus();
       setShowAdminModal(true);
       return;
     }
-    if (action === 'Reload System' && user?.role === 'admin') {
+    if (action === 'Reload System') {
       handleReloadDocuments();
       return;
     }
@@ -573,7 +451,7 @@ const App = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  if (showLogin) {
+  if (showRoleSelector) {
     return (
       <div style={styles.loginContainer}>
         <div style={styles.loginCard}>
@@ -583,59 +461,68 @@ const App = () => {
             </div>
             <div style={styles.logoText}>
               <h2 style={styles.logoTitle}>Hospital AI Assistant</h2>
-              <p style={styles.logoSubtitle}>Please login to continue</p>
+              <p style={styles.logoSubtitle}>Select your role to continue</p>
             </div>
           </div>
           
           <div style={{...styles.connectionStatus, ...styles[connectionStatus]}}>
             <Icons.StatusDot status={
-              connectionStatus === 'connected' || connectionStatus === 'authenticated' ? 'success' :
+              connectionStatus === 'connected' ? 'success' :
               connectionStatus === 'error' ? 'error' : 'warning'
             } />
             {connectionStatus === 'connecting' && 'Connecting...'}
             {connectionStatus === 'connected' && 'Connected'}
             {connectionStatus === 'error' && 'Connection Error'}
-            {connectionStatus === 'disconnected' && 'Disconnected'}
-            {connectionStatus === 'authenticated' && 'Authenticated'}
           </div>
           
-          <form onSubmit={handleLogin} style={styles.loginForm}>
-            <input
-              type="text"
-              placeholder="Username"
-              value={loginCredentials.username}
-              onChange={(e) => setLoginCredentials(prev => ({...prev, username: e.target.value}))}
-              style={styles.loginInput}
-              required
-              disabled={loading}
-            />
-            
-            <input
-              type="password"
-              placeholder="Password"
-              value={loginCredentials.password}
-              onChange={(e) => setLoginCredentials(prev => ({...prev, password: e.target.value}))}
-              style={styles.loginInput}
-              required
-              disabled={loading}
-            />
-            
-            {authError && <div style={styles.authError}>{authError}</div>}
-            
+          <div style={styles.roleButtons}>
             <button 
-              type="submit" 
-              style={{...styles.loginButton, ...(loading ? styles.loginButtonDisabled : {})}}
-              disabled={loading || connectionStatus === 'error'}
+              style={styles.roleButton}
+              onClick={() => handleRoleSelection('patient')}
+              disabled={connectionStatus === 'error'}
             >
-              {loading ? 'Logging in...' : 'Login'}
+              <div style={styles.roleIcon}>👤</div>
+              <div>
+                <h3 style={styles.roleTitle}>Patient</h3>
+                <p style={styles.roleDesc}>Book appointments, view treatments</p>
+              </div>
             </button>
-          </form>
-          
-          <div style={styles.demoCredentials}>
-            <h4>Demo Credentials:</h4>
-            <p><strong>Admin:</strong> admin / admin123</p>
-            <p><strong>Staff:</strong> staff1 / staff123</p>
-            <p><strong>Patient:</strong> patient1 / patient123</p>
+
+            <button 
+              style={styles.roleButton}
+              onClick={() => handleRoleSelection('visitor')}
+              disabled={connectionStatus === 'error'}
+            >
+              <div style={styles.roleIcon}>🚶</div>
+              <div>
+                <h3 style={styles.roleTitle}>Visitor</h3>
+                <p style={styles.roleDesc}>Visiting hours, directions</p>
+              </div>
+            </button>
+
+            <button 
+              style={styles.roleButton}
+              onClick={() => handleRoleSelection('staff')}
+              disabled={connectionStatus === 'error'}
+            >
+              <div style={styles.roleIcon}>👨‍⚕️</div>
+              <div>
+                <h3 style={styles.roleTitle}>Staff</h3>
+                <p style={styles.roleDesc}>Patient inquiries, protocols</p>
+              </div>
+            </button>
+
+            <button 
+              style={styles.roleButton}
+              onClick={() => handleRoleSelection('admin')}
+              disabled={connectionStatus === 'error'}
+            >
+              <div style={styles.roleIcon}>⚙️</div>
+              <div>
+                <h3 style={styles.roleTitle}>Admin</h3>
+                <p style={styles.roleDesc}>Manage documents, system</p>
+              </div>
+            </button>
           </div>
           
           {connectionStatus === 'error' && (
@@ -667,18 +554,14 @@ const App = () => {
             </div>
             <div style={styles.headerControls}>
               <div style={styles.userInfo}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icons.User />
-                  <span style={styles.userName}>{user?.username}</span>
-                </div>
-                <span style={styles.userRole}>{user?.role}</span>
+                <span style={styles.userRole}>{userRole}</span>
               </div>
-              {user?.role === 'admin' && (
+              {userRole === 'admin' && (
                 <button 
                   style={styles.adminPanelBtn}
                   onClick={() => {
                     setShowAdminModal(true);
-                    loadDocuments(localStorage.getItem('access_token'));
+                    loadDocuments();
                     loadSystemStatus();
                   }}
                 >
@@ -686,9 +569,16 @@ const App = () => {
                   <span>Dashboard</span>
                 </button>
               )}
-              <button style={styles.logoutBtn} onClick={handleLogout}>
-                <Icons.Logout />
-                <span>Logout</span>
+              <button 
+                style={styles.logoutBtn} 
+                onClick={() => {
+                  setShowRoleSelector(true);
+                  setMessages([]);
+                  setMessageCount(0);
+                  setShowQuickActions(true);
+                }}
+              >
+                Switch Role
               </button>
             </div>
           </div>
@@ -749,13 +639,13 @@ const App = () => {
             }}
             placeholder="Type your message..."
             style={styles.messageInput}
-            disabled={!isAuthenticated || isTyping}
+            disabled={isTyping}
             rows={1}
           />
           <button 
             onClick={handleSendMessage} 
             style={{...styles.sendButton, ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {})}}
-            disabled={!isAuthenticated || !inputMessage.trim() || isTyping}
+            disabled={!inputMessage.trim() || isTyping}
           >
             {isTyping ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -938,14 +828,13 @@ const App = () => {
   );
 };
 
-// Updated color scheme to match your CSS
 const styles = {
   loginContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     padding: '20px'
   },
   loginCard: {
@@ -953,7 +842,7 @@ const styles = {
     borderRadius: '20px',
     padding: '40px',
     width: '100%',
-    maxWidth: '450px',
+    maxWidth: '550px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   hospitalLogo: {
@@ -965,7 +854,7 @@ const styles = {
   logoIcon: {
     width: '60px',
     height: '60px',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     borderRadius: '15px',
     display: 'flex',
     alignItems: 'center',
@@ -977,7 +866,7 @@ const styles = {
   logoIconSmall: {
     width: '45px',
     height: '45px',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -1018,68 +907,51 @@ const styles = {
     background: '#d1fae5',
     color: '#065f46'
   },
-  authenticated: {
-    background: '#dbeafe',
-    color: '#1e40af'
-  },
   error: {
     background: '#fee2e2',
     color: '#991b1b'
   },
-  disconnected: {
-    background: '#f3f4f6',
-    color: '#4b5563'
-  },
-  loginForm: {
+  roleButtons: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px'
+    gap: '12px',
+    marginTop: '20px'
   },
-  loginInput: {
-    padding: '16px',
-    border: '2px solid #e8f1ff', // Changed
-    borderRadius: '12px',
-    fontSize: '16px',
-    transition: 'all 0.3s',
-    outline: 'none',
-    fontFamily: 'inherit',
-    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
-  },
-  authError: {
-    padding: '12px 16px',
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '10px',
-    fontSize: '14px',
+  roleButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
-  },
-  loginButton: {
-    padding: '16px',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    fontSize: '16px',
-    fontWeight: 'bold',
+    gap: '16px',
+    padding: '18px 20px',
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)',
+    border: '2px solid #e8f1ff',
+    borderRadius: '14px',
     cursor: 'pointer',
     transition: 'all 0.3s',
+    textAlign: 'left',
+    width: '100%',
+    fontFamily: 'inherit'
+  },
+  roleIcon: {
+    fontSize: '32px',
+    width: '50px',
+    height: '50px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px'
-  },
-  loginButtonDisabled: {
-    opacity: 0.6,
-    cursor: 'not-allowed'
-  },
-  demoCredentials: {
-    marginTop: '25px',
-    padding: '20px',
-    background: '#f7fafc',
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     borderRadius: '12px',
-    fontSize: '14px'
+    flexShrink: 0
+  },
+  roleTitle: {
+    margin: 0,
+    fontSize: '18px',
+    color: '#2d3748',
+    fontWeight: '600'
+  },
+  roleDesc: {
+    margin: '4px 0 0 0',
+    fontSize: '13px',
+    color: '#718096'
   },
   connectionError: {
     marginTop: '15px',
@@ -1097,7 +969,7 @@ const styles = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   },
   chatbotHeader: {
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     color: 'white',
     padding: '20px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
@@ -1130,14 +1002,13 @@ const styles = {
     alignItems: 'flex-end',
     gap: '4px'
   },
-  userName: {
-    fontWeight: 'bold',
-    fontSize: '14px'
-  },
   userRole: {
-    fontSize: '12px',
-    opacity: 0.8,
-    textTransform: 'capitalize'
+    fontSize: '14px',
+    fontWeight: '600',
+    textTransform: 'capitalize',
+    padding: '6px 12px',
+    background: 'rgba(255,255,255,0.2)',
+    borderRadius: '8px'
   },
   adminPanelBtn: {
     padding: '10px 16px',
@@ -1157,15 +1028,12 @@ const styles = {
     padding: '10px 16px',
     background: 'rgba(255,255,255,0.9)',
     border: 'none',
-    color: '#1F3A9E', // Changed
+    color: '#1F3A9E',
     borderRadius: '10px',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 'bold',
-    transition: 'all 0.3s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
+    transition: 'all 0.3s'
   },
   chatMessages: {
     flex: 1,
@@ -1174,7 +1042,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '15px',
-    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)'
   },
   message: {
     maxWidth: '70%',
@@ -1185,15 +1053,15 @@ const styles = {
   },
   messageUser: {
     alignSelf: 'flex-end',
-    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)',
     color: 'white'
   },
   messageBot: {
     alignSelf: 'flex-start',
-    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
-    color: '#1F3A9E', // Changed
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)',
+    color: '#1F3A9E',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    border: '1px solid #d1e4ff' // Changed
+    border: '1px solid #d1e4ff'
   },
   messageContent: {
     fontSize: '15px',
@@ -1213,13 +1081,13 @@ const styles = {
     width: '8px',
     height: '8px',
     borderRadius: '50%',
-    background: '#2E4AC7', // Changed
+    background: '#2E4AC7',
     animation: 'bounce 1.4s infinite ease-in-out'
   },
   quickActions: {
     padding: '20px',
-    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
-    borderTop: '1px solid #d1e4ff', // Changed
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)',
+    borderTop: '1px solid #d1e4ff',
     animation: 'slideUp 0.4s ease-out'
   },
   quickActionsHeader: {
@@ -1231,16 +1099,16 @@ const styles = {
   quickActionsTitle: {
     margin: 0,
     fontSize: '16px',
-    color: '#1F3A9E', // Changed
+    color: '#1F3A9E',
     fontWeight: '600'
   },
   messageCounter: {
     fontSize: '13px',
     color: '#718096',
     padding: '6px 12px',
-    background: 'rgba(255, 140, 0, 0.1)', // Changed
+    background: 'rgba(255, 140, 0, 0.1)',
     borderRadius: '12px',
-    border: '1px solid rgba(255, 140, 0, 0.2)' // Changed
+    border: '1px solid rgba(255, 140, 0, 0.2)'
   },
   actionButtons: {
     display: 'flex',
@@ -1249,7 +1117,7 @@ const styles = {
   },
   actionBtn: {
     padding: '12px 18px',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
@@ -1258,19 +1126,19 @@ const styles = {
     fontWeight: '500',
     transition: 'all 0.3s',
     whiteSpace: 'nowrap',
-    boxShadow: '0 2px 4px rgba(46, 74, 199, 0.3)' // Changed
+    boxShadow: '0 2px 4px rgba(46, 74, 199, 0.3)'
   },
   chatInput: {
     display: 'flex',
     gap: '12px',
     padding: '20px',
     background: 'white',
-    borderTop: '1px solid #e8f1ff' // Changed
+    borderTop: '1px solid #e8f1ff'
   },
   messageInput: {
     flex: 1,
     padding: '14px 18px',
-    border: '2px solid #d1e4ff', // Changed
+    border: '2px solid #d1e4ff',
     borderRadius: '16px',
     fontSize: '15px',
     resize: 'none',
@@ -1278,11 +1146,11 @@ const styles = {
     fontFamily: 'inherit',
     maxHeight: '120px',
     transition: 'border-color 0.3s',
-    background: 'linear-gradient(135deg, #fafcff 0%, #f8fafe 100%)' // Changed
+    background: 'linear-gradient(135deg, #fafcff 0%, #f8fafe 100%)'
   },
   sendButton: {
     padding: '14px 24px',
-    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '16px',
@@ -1323,7 +1191,7 @@ const styles = {
     animation: 'fadeIn 0.3s ease-in'
   },
   modalContainer: {
-    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)', // Changed
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)',
     borderRadius: '20px',
     width: '100%',
     maxWidth: '900px',
@@ -1339,7 +1207,7 @@ const styles = {
     alignItems: 'center',
     padding: '25px 30px',
     borderBottom: '1px solid #e2e8f0',
-    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)', // Changed
+    background: 'linear-gradient(135deg, #2E4AC7 0%, #1F3A9E 100%)',
     color: 'white',
     borderTopLeftRadius: '20px',
     borderTopRightRadius: '20px'
@@ -1347,18 +1215,18 @@ const styles = {
   modalTitle: {
     margin: 0,
     fontSize: '24px',
-    color: 'white', // Changed
+    color: 'white',
     fontWeight: '600'
   },
   modalClose: {
     width: '44px',
     height: '44px',
     border: 'none',
-    background: 'rgba(255,255,255,0.2)', // Changed
+    background: 'rgba(255,255,255,0.2)',
     borderRadius: '12px',
     cursor: 'pointer',
     fontSize: '20px',
-    color: 'white', // Changed
+    color: 'white',
     transition: 'all 0.3s',
     display: 'flex',
     alignItems: 'center',
@@ -1371,18 +1239,18 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '24px',
-    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)'
   },
   adminCard: {
-    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)', // Changed
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)',
     borderRadius: '16px',
     padding: '28px',
-    border: '1px solid #e8f1ff' // Changed
+    border: '1px solid #e8f1ff'
   },
   cardTitle: {
     margin: '0 0 20px 0',
     fontSize: '18px',
-    color: '#1F3A9E', // Changed
+    color: '#1F3A9E',
     fontWeight: '600'
   },
   cardHeader: {
@@ -1401,30 +1269,30 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)', // Changed
+    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)',
     borderRadius: '12px',
     fontSize: '14px',
-    border: '1px solid #e8f1ff' // Changed
+    border: '1px solid #e8f1ff'
   },
   statusSuccess: {
-    color: '#28a745', // Green from CSS
+    color: '#28a745',
     fontWeight: '600'
   },
   statusError: {
-    color: '#dc3545', // Red from CSS
+    color: '#dc3545',
     fontWeight: '600'
   },
   uploadArea: {
-    border: '2px dashed #d1e4ff', // Changed
+    border: '2px dashed #d1e4ff',
     borderRadius: '16px',
     padding: '48px 24px',
     textAlign: 'center',
     cursor: 'pointer',
     transition: 'all 0.3s',
-    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)' // Changed
+    background: 'linear-gradient(135deg, #fafcff 0%, #f5f9ff 100%)'
   },
   uploadAreaDragOver: {
-    borderColor: '#2E4AC7', // Changed
+    borderColor: '#2E4AC7',
     background: '#eef2ff'
   },
   uploadText: {
@@ -1441,10 +1309,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)', // Changed
+    background: 'linear-gradient(135deg, #e8f1ff 0%, #f0f8ff 100%)',
     borderRadius: '12px',
     marginTop: '16px',
-    border: '1px solid #d1e4ff' // Changed
+    border: '1px solid #d1e4ff'
   },
   removeFileBtn: {
     width: '32px',
@@ -1464,7 +1332,7 @@ const styles = {
   uploadBtn: {
     width: '100%',
     padding: '14px 20px',
-    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)', // Changed
+    background: 'linear-gradient(135deg, #FF8C00 0%, #FFA500 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -1485,19 +1353,19 @@ const styles = {
   progressBar: {
     width: '100%',
     height: '8px',
-    background: '#e8f1ff', // Changed
+    background: '#e8f1ff',
     borderRadius: '4px',
     marginTop: '16px',
     overflow: 'hidden'
   },
   progressFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #FF8C00, #FFA500)', // Changed
+    background: 'linear-gradient(90deg, #FF8C00, #FFA500)',
     transition: 'width 0.3s ease-in-out'
   },
   reloadBtn: {
     padding: '10px 16px',
-    background: '#28a745', // Changed to green from CSS
+    background: '#28a745',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
@@ -1527,9 +1395,9 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)', // Changed
+    background: 'linear-gradient(135deg, #f8fafe 0%, #f0f8ff 100%)',
     borderRadius: '12px',
-    border: '1px solid #e8f1ff' // Changed
+    border: '1px solid #e8f1ff'
   },
   docSize: {
     fontSize: '12px',
@@ -1538,7 +1406,6 @@ const styles = {
   }
 };
 
-// Add CSS animations
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes fadeIn {
@@ -1561,34 +1428,9 @@ styleSheet.textContent = `
     100% { transform: rotate(360deg); }
   }
   
-  .login-button:hover:not(:disabled) {
+  button:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(46, 74, 199, 0.4);
-  }
-  
-  .action-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(46, 74, 199, 0.4);
-  }
-  
-  .admin-panel-btn:hover {
-    background: rgba(255,255,255,0.3);
-  }
-  
-  .logout-btn:hover {
-    background: rgba(255,255,255,1);
-  }
-  
-  .modal-close:hover {
-    background: rgba(255,255,255,0.3);
-  }
-  
-  .remove-file-btn:hover {
-    background: #fecaca;
-  }
-  
-  .reload-btn:hover {
-    background: #20c997;
+    filter: brightness(1.1);
   }
   
   @media (max-width: 768px) {
@@ -1601,13 +1443,6 @@ styleSheet.textContent = `
     .modal-content { padding: 20px !important; }
     .admin-card { padding: 20px !important; }
     .status-grid { grid-template-columns: 1fr !important; }
-  }
-  
-  @media (max-width: 480px) {
-    .header-content { flex-direction: column !important; align-items: flex-start !important; }
-    .header-controls { width: 100% !important; justify-content: space-between !important; }
-    .user-info { align-items: flex-start !important; }
-    .message { max-width: 90% !important; font-size: 14px !important; }
   }
 `;
 document.head.appendChild(styleSheet);
