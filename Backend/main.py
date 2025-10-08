@@ -1,11 +1,11 @@
-# main.py - Complete KG Hospital Chatbot API with Admin Features (FIXED CHAT LOG)
+# main.py - Complete KG Hospital Chatbot API with Fixed Table Representation
 import re
 import os
 import tempfile
 import time
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -77,6 +77,13 @@ except Exception as e:
     FIREBASE_INITIALIZED = False
     db = None
 
+# In-memory storage as fallback
+in_memory_storage = {
+    'chat_history': [],
+    'appointment_requests': [],
+    'admin_notifications': []
+}
+
 vectorstore = None
 conversation_chain = None
 loaded_documents = []
@@ -111,293 +118,311 @@ class AppointmentAction(BaseModel):
     admin_notes: Optional[str] = None
 
 # =============================================================================
-# FIREBASE FIRESTORE FUNCTIONS (COMPLETELY FIXED)
+# STORAGE FUNCTIONS (WITH FALLBACK)
 # =============================================================================
 def save_chat_history(user_id: str, user_role: str, user_name: str, 
                      message: str, response: str, is_appointment: bool = False):
-    """Save chat conversation to Firestore."""
-    if not FIREBASE_INITIALIZED or not db:
-        print("Firebase not initialized, skipping chat history save")
-        return False
+    """Save chat conversation with Firestore fallback to in-memory storage."""
     
-    try:
-        # Create a clean timestamp for sorting
-        current_time = datetime.now()
-        timestamp_str = current_time.isoformat()
-        
-        chat_data = {
-            'user_id': user_id or 'anonymous',
-            'user_role': user_role,
-            'user_name': user_name or 'Anonymous User',
-            'message': message,
-            'response': response,
-            'is_appointment_request': is_appointment,
-            'created_at': timestamp_str,
-            'timestamp': current_time
-        }
-        
-        # Add document with explicit timestamp
-        doc_ref = db.collection('chat_history').document()
-        chat_data['id'] = doc_ref.id
-        doc_ref.set(chat_data)
-        
-        print(f"✓ Chat history saved for user: {user_name}")
-        return True
-    except Exception as e:
-        print(f"✗ Error saving chat history: {e}")
-        return False
+    chat_data = {
+        'id': str(uuid.uuid4()),
+        'user_id': user_id or 'anonymous',
+        'user_role': user_role,
+        'user_name': user_name or 'Anonymous User',
+        'message': message,
+        'response': response,
+        'is_appointment_request': is_appointment,
+        'created_at': datetime.now().isoformat()
+    }
+    
+    # Try Firestore first
+    if FIREBASE_INITIALIZED and db:
+        try:
+            doc_ref = db.collection('chat_history').document(chat_data['id'])
+            doc_ref.set(chat_data)
+            print(f"✓ Chat history saved to Firestore for user: {user_name}")
+            return True
+        except Exception as e:
+            print(f"✗ Firestore save failed, using in-memory: {e}")
+    
+    # Fallback to in-memory storage
+    in_memory_storage['chat_history'].append(chat_data)
+    print(f"✓ Chat history saved to memory for user: {user_name}")
+    return True
 
 def save_appointment_request(user_name: str, phone_number: str, 
                             preferred_date: str, preferred_time: str, 
                             reason: str, user_role: str, original_message: str):
-    """Save appointment request to Firestore for admin review."""
-    if not FIREBASE_INITIALIZED or not db:
-        print("Firebase not initialized, skipping appointment save")
-        return None
+    """Save appointment request with Firestore fallback."""
     
-    try:
-        appointment_id = str(uuid.uuid4())
-        current_time = datetime.now()
-        
-        appointment_data = {
-            'appointment_id': appointment_id,
-            'user_name': user_name,
-            'phone_number': phone_number,
-            'preferred_date': preferred_date,
-            'preferred_time': preferred_time,
-            'reason': reason,
-            'user_role': user_role,
-            'original_message': original_message,
-            'status': 'pending',  # pending, accepted, rejected
-            'admin_notes': '',
-            'created_at': current_time.isoformat(),
-            'timestamp': current_time
-        }
-        
-        db.collection('appointment_requests').document(appointment_id).set(appointment_data)
-        
-        # Create notification for admin
-        save_admin_notification(
-            "📅 New Appointment Request",
-            f"Patient: {user_name}\nPhone: {phone_number}\nDate: {preferred_date}\nTime: {preferred_time}",
-            "appointment_request"
-        )
-        
-        print(f"✓ Appointment request saved: {appointment_id}")
-        return appointment_id
-    except Exception as e:
-        print(f"✗ Error saving appointment request: {e}")
-        return None
+    appointment_id = str(uuid.uuid4())
+    appointment_data = {
+        'appointment_id': appointment_id,
+        'user_name': user_name,
+        'phone_number': phone_number,
+        'preferred_date': preferred_date,
+        'preferred_time': preferred_time,
+        'reason': reason,
+        'user_role': user_role,
+        'original_message': original_message,
+        'status': 'pending',
+        'admin_notes': '',
+        'created_at': datetime.now().isoformat()
+    }
+    
+    # Try Firestore first
+    if FIREBASE_INITIALIZED and db:
+        try:
+            db.collection('appointment_requests').document(appointment_id).set(appointment_data)
+            print(f"✓ Appointment request saved to Firestore: {appointment_id}")
+            
+            # Create notification
+            save_admin_notification(
+                "📅 New Appointment Request",
+                f"Patient: {user_name}\nPhone: {phone_number}\nDate: {preferred_date}\nTime: {preferred_time}",
+                "appointment_request"
+            )
+            return appointment_id
+        except Exception as e:
+            print(f"✗ Firestore save failed, using in-memory: {e}")
+    
+    # Fallback to in-memory storage
+    in_memory_storage['appointment_requests'].append(appointment_data)
+    
+    # Create notification
+    save_admin_notification(
+        "📅 New Appointment Request",
+        f"Patient: {user_name}\nPhone: {phone_number}\nDate: {preferred_date}\nTime: {preferred_time}",
+        "appointment_request"
+    )
+    
+    print(f"✓ Appointment request saved to memory: {appointment_id}")
+    return appointment_id
 
 def get_all_chat_history(user_role: Optional[str] = None, limit: int = 100):
-    """Retrieve chat history for admin dashboard - COMPLETELY FIXED."""
-    if not FIREBASE_INITIALIZED or not db:
-        print("Firebase not initialized")
-        return []
+    """Retrieve chat history with Firestore fallback."""
     
     try:
-        # Create a composite index-friendly query
-        query = db.collection('chat_history')
+        # Try Firestore first
+        if FIREBASE_INITIALIZED and db:
+            try:
+                query = db.collection('chat_history')
+                if user_role and user_role != 'all':
+                    query = query.where('user_role', '==', user_role)
+                
+                docs = query.limit(limit).stream()
+                history = []
+                for doc in docs:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    history.append(data)
+                
+                # Sort by created_at
+                history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                print(f"✓ Retrieved {len(history)} chat history records from Firestore")
+                return history
+            except Exception as e:
+                print(f"✗ Firestore retrieval failed: {e}")
         
+        # Fallback to in-memory storage
+        history = in_memory_storage['chat_history'].copy()
+        
+        # Filter by role if specified
         if user_role and user_role != 'all':
-            query = query.where('user_role', '==', user_role)
+            history = [chat for chat in history if chat.get('user_role') == user_role]
         
-        # Get all documents and sort in memory
-        docs = query.limit(limit).stream()
-        
-        history = []
-        for doc in docs:
-            data = doc.to_dict()
-            data['id'] = doc.id
-            
-            # Ensure all required fields with proper defaults
-            data.setdefault('user_name', 'Unknown')
-            data.setdefault('user_role', 'patient')
-            data.setdefault('message', 'No message')
-            data.setdefault('response', 'No response')
-            data.setdefault('is_appointment_request', False)
-            
-            # Handle timestamp conversion
-            timestamp = data.get('timestamp')
-            if timestamp:
-                if isinstance(timestamp, datetime):
-                    data['created_at'] = timestamp.isoformat()
-                else:
-                    data['created_at'] = str(timestamp)
-            else:
-                data['created_at'] = data.get('created_at', '')
-            
-            history.append(data)
-        
-        # Sort by timestamp in memory (most recent first)
+        # Sort and limit
         history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        history = history[:limit]
         
-        print(f"✓ Retrieved {len(history)} chat history records")
+        print(f"✓ Retrieved {len(history)} chat history records from memory")
         return history
         
     except Exception as e:
         print(f"✗ Error retrieving chat history: {e}")
-        # Fallback: return empty array
         return []
 
 def get_appointment_requests(status: Optional[str] = None):
-    """Retrieve appointment requests for admin dashboard."""
-    if not FIREBASE_INITIALIZED or not db:
-        print("Firebase not initialized")
-        return []
+    """Retrieve appointment requests with Firestore fallback."""
     
     try:
-        query = db.collection('appointment_requests')
-        
-        if status:
-            query = query.where('status', '==', status)
-        
-        docs = query.stream()
-        
-        appointments = []
-        for doc in docs:
-            data = doc.to_dict()
-            # Ensure all required fields exist
-            data.setdefault('user_name', 'Unknown')
-            data.setdefault('phone_number', 'Not provided')
-            data.setdefault('preferred_date', 'Not specified')
-            data.setdefault('preferred_time', 'Not specified')
-            data.setdefault('reason', 'Not specified')
-            data.setdefault('status', 'pending')
-            data.setdefault('admin_notes', '')
-            data.setdefault('original_message', '')
-            
-            # Handle timestamp
-            timestamp = data.get('timestamp')
-            if timestamp:
-                if isinstance(timestamp, datetime):
-                    data['created_at'] = timestamp.isoformat()
-                else:
-                    data['created_at'] = str(timestamp)
-            else:
-                data['created_at'] = data.get('created_at', '')
+        # Try Firestore first
+        if FIREBASE_INITIALIZED and db:
+            try:
+                query = db.collection('appointment_requests')
+                if status:
+                    query = query.where('status', '==', status)
                 
-            appointments.append(data)
+                docs = query.stream()
+                appointments = []
+                for doc in docs:
+                    data = doc.to_dict()
+                    appointments.append(data)
+                
+                # Sort by created_at
+                appointments.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                print(f"✓ Retrieved {len(appointments)} appointment requests from Firestore")
+                return appointments
+            except Exception as e:
+                print(f"✗ Firestore retrieval failed: {e}")
         
-        # Sort by created_at in memory
+        # Fallback to in-memory storage
+        appointments = in_memory_storage['appointment_requests'].copy()
+        
+        # Filter by status if specified
+        if status:
+            appointments = [apt for apt in appointments if apt.get('status') == status]
+        
+        # Sort by created_at
         appointments.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         
-        print(f"✓ Retrieved {len(appointments)} appointment requests")
+        print(f"✓ Retrieved {len(appointments)} appointment requests from memory")
         return appointments
+        
     except Exception as e:
         print(f"✗ Error retrieving appointment requests: {e}")
         return []
 
 def update_appointment_status(appointment_id: str, action: str, admin_notes: str = ""):
-    """Update appointment request status (accept/reject)."""
-    if not FIREBASE_INITIALIZED or not db:
-        print("Firebase not initialized")
-        return False
+    """Update appointment request status with Firestore fallback."""
     
-    try:
-        doc_ref = db.collection('appointment_requests').document(appointment_id)
-        doc = doc_ref.get()
-        
-        if not doc.exists:
-            print(f"✗ Appointment {appointment_id} not found")
-            return False
-        
-        appointment_data = doc.to_dict()
-        new_status = 'accepted' if action == 'accept' else 'rejected'
-        update_data = {
-            'status': new_status,
-            'admin_notes': admin_notes,
-            'updated_at': datetime.now().isoformat()
-        }
-        
-        doc_ref.update(update_data)
-        
-        # Save notification for admin about the action
-        save_admin_notification(
-            f"📋 Appointment {new_status.capitalize()}",
-            f"Patient: {appointment_data.get('user_name', 'Unknown')}\n"
-            f"Phone: {appointment_data.get('phone_number', 'Not provided')}\n"
-            f"Status: {new_status}\n"
-            f"Notes: {admin_notes}",
-            "appointment_action"
-        )
-        
-        print(f"✓ Appointment {appointment_id} status updated to: {new_status}")
-        return True
-    except Exception as e:
-        print(f"✗ Error updating appointment status: {e}")
-        return False
+    new_status = 'accepted' if action == 'accept' else 'rejected'
+    
+    # Try Firestore first
+    if FIREBASE_INITIALIZED and db:
+        try:
+            doc_ref = db.collection('appointment_requests').document(appointment_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                appointment_data = doc.to_dict()
+                update_data = {
+                    'status': new_status,
+                    'admin_notes': admin_notes,
+                    'updated_at': datetime.now().isoformat()
+                }
+                doc_ref.update(update_data)
+                
+                # Save notification
+                save_admin_notification(
+                    f"📋 Appointment {new_status.capitalize()}",
+                    f"Patient: {appointment_data.get('user_name', 'Unknown')}\n"
+                    f"Phone: {appointment_data.get('phone_number', 'Not provided')}\n"
+                    f"Status: {new_status}\n"
+                    f"Notes: {admin_notes}",
+                    "appointment_action"
+                )
+                
+                print(f"✓ Appointment {appointment_id} status updated in Firestore to: {new_status}")
+                return True
+        except Exception as e:
+            print(f"✗ Firestore update failed: {e}")
+    
+    # Fallback to in-memory storage
+    for appointment in in_memory_storage['appointment_requests']:
+        if appointment.get('appointment_id') == appointment_id:
+            appointment['status'] = new_status
+            appointment['admin_notes'] = admin_notes
+            appointment['updated_at'] = datetime.now().isoformat()
+            
+            # Save notification
+            save_admin_notification(
+                f"📋 Appointment {new_status.capitalize()}",
+                f"Patient: {appointment.get('user_name', 'Unknown')}\n"
+                f"Phone: {appointment.get('phone_number', 'Not provided')}\n"
+                f"Status: {new_status}\n"
+                f"Notes: {admin_notes}",
+                "appointment_action"
+            )
+            
+            print(f"✓ Appointment {appointment_id} status updated in memory to: {new_status}")
+            return True
+    
+    print(f"✗ Appointment {appointment_id} not found")
+    return False
 
 def save_admin_notification(title: str, message: str, notification_type: str = "info"):
-    """Save notification for admin dashboard."""
-    if not FIREBASE_INITIALIZED or not db:
-        return False
+    """Save notification with Firestore fallback."""
     
-    try:
-        current_time = datetime.now()
-        notification_data = {
-            'title': title,
-            'message': message,
-            'type': notification_type,
-            'read': False,
-            'created_at': current_time.isoformat(),
-            'timestamp': current_time
-        }
-        
-        db.collection('admin_notifications').add(notification_data)
-        print(f"✓ Admin notification saved: {title}")
-        return True
-    except Exception as e:
-        print(f"✗ Error saving admin notification: {e}")
-        return False
+    notification_data = {
+        'id': str(uuid.uuid4()),
+        'title': title,
+        'message': message,
+        'type': notification_type,
+        'read': False,
+        'created_at': datetime.now().isoformat()
+    }
+    
+    # Try Firestore first
+    if FIREBASE_INITIALIZED and db:
+        try:
+            db.collection('admin_notifications').add(notification_data)
+            print(f"✓ Admin notification saved to Firestore: {title}")
+            return True
+        except Exception as e:
+            print(f"✗ Firestore save failed, using in-memory: {e}")
+    
+    # Fallback to in-memory storage
+    in_memory_storage['admin_notifications'].append(notification_data)
+    print(f"✓ Admin notification saved to memory: {title}")
+    return True
 
 def get_admin_notifications(limit: int = 20):
-    """Get admin notifications."""
-    if not FIREBASE_INITIALIZED or not db:
-        return []
+    """Get admin notifications with Firestore fallback."""
     
     try:
-        # Simple query without complex ordering
-        query = db.collection('admin_notifications')
-        docs = query.limit(limit).stream()
+        # Try Firestore first
+        if FIREBASE_INITIALIZED and db:
+            try:
+                query = db.collection('admin_notifications')
+                docs = query.limit(limit).stream()
+                
+                notifications = []
+                for doc in docs:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    notifications.append(data)
+                
+                # Sort by created_at
+                notifications.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                return notifications
+            except Exception as e:
+                print(f"✗ Firestore retrieval failed: {e}")
         
-        notifications = []
-        for doc in docs:
-            data = doc.to_dict()
-            data['id'] = doc.id
-            
-            # Ensure all fields exist
-            data.setdefault('title', 'No Title')
-            data.setdefault('message', 'No Message')
-            data.setdefault('type', 'info')
-            data.setdefault('read', False)
-            data.setdefault('created_at', '')
-            
-            notifications.append(data)
-        
-        # Sort by created_at in memory
+        # Fallback to in-memory storage
+        notifications = in_memory_storage['admin_notifications'].copy()
         notifications.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        notifications = notifications[:limit]
         
         return notifications
+        
     except Exception as e:
         print(f"Error retrieving notifications: {e}")
         return []
 
 def mark_notification_read(notification_id: str):
-    """Mark a notification as read."""
-    if not FIREBASE_INITIALIZED or not db:
-        return False
+    """Mark a notification as read with Firestore fallback."""
     
-    try:
-        doc_ref = db.collection('admin_notifications').document(notification_id)
-        doc_ref.update({
-            'read': True, 
-            'read_at': datetime.now().isoformat()
-        })
-        return True
-    except Exception as e:
-        print(f"Error marking notification as read: {e}")
-        return False
+    # Try Firestore first
+    if FIREBASE_INITIALIZED and db:
+        try:
+            doc_ref = db.collection('admin_notifications').document(notification_id)
+            doc_ref.update({
+                'read': True, 
+                'read_at': datetime.now().isoformat()
+            })
+            return True
+        except Exception as e:
+            print(f"✗ Firestore update failed: {e}")
+    
+    # Fallback to in-memory storage
+    for notification in in_memory_storage['admin_notifications']:
+        if notification.get('id') == notification_id:
+            notification['read'] = True
+            notification['read_at'] = datetime.now().isoformat()
+            return True
+    
+    return False
 
 # =============================================================================
 # APPOINTMENT DETECTION & EXTRACTION
@@ -633,7 +658,7 @@ def reload_all_documents():
     return False, "No documents could be processed"
 
 # =============================================================================
-# RESPONSE FORMATTER
+# RESPONSE FORMATTER - COMPLETELY FIXED TABLE HANDLING
 # =============================================================================
 def format_response_text(text: str) -> str:
     """Format chatbot output into clean, ChatGPT-like layout for React frontend."""
@@ -642,33 +667,86 @@ def format_response_text(text: str) -> str:
 
     original_text = text.strip()
     
-    # Handle table format - preserve tables exactly as they are
-    if 'table format' in original_text.lower() or ('|' in original_text and '---' in original_text):
-        # Clean up table formatting
-        lines = original_text.split('\n')
-        formatted_lines = []
-        in_table = False
-        
-        for line in lines:
-            line = line.strip()
-            if '|' in line and '---' in line:
-                in_table = True
-                formatted_lines.append(line)
-            elif '|' in line and in_table:
-                formatted_lines.append(line)
-            elif line and not in_table:
-                # Handle non-table content
-                if line.startswith('**') and line.endswith('**'):
-                    formatted_lines.append(f"\n{line}\n")
-                else:
-                    formatted_lines.append(line)
-            elif not line and in_table:
-                in_table = False
-                formatted_lines.append('')
-        
-        return '\n'.join(formatted_lines)
+    # Enhanced table detection - look for multiple table patterns
+    table_sections = []
+    non_table_sections = []
     
-    text = original_text
+    lines = original_text.split('\n')
+    current_section = []
+    in_table = False
+    table_start_index = -1
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        
+        # Check if this line starts a table (has pipes and dashes or multiple pipes)
+        if ('|' in line and '---' in line) or (line.count('|') >= 2 and any(char in line for char in ['-', '=', ':'])):
+            if not in_table and current_section:
+                # Save previous non-table section
+                non_table_sections.append('\n'.join(current_section))
+                current_section = []
+            
+            in_table = True
+            table_start_index = i if table_start_index == -1 else table_start_index
+            current_section.append(line)
+            
+        elif in_table and '|' in line:
+            # Continue table
+            current_section.append(line)
+            
+        elif in_table and not line:
+            # Empty line in table - continue
+            current_section.append(line)
+            
+        elif in_table and not ('|' in line and line.count('|') >= 2):
+            # Table ended
+            if current_section:
+                table_sections.append({
+                    'start_index': table_start_index,
+                    'content': '\n'.join(current_section)
+                })
+                current_section = []
+            in_table = False
+            table_start_index = -1
+            current_section.append(line)
+            
+        else:
+            # Regular text
+            current_section.append(line)
+    
+    # Handle remaining content
+    if current_section:
+        if in_table:
+            table_sections.append({
+                'start_index': table_start_index,
+                'content': '\n'.join(current_section)
+            })
+        else:
+            non_table_sections.append('\n'.join(current_section))
+    
+    # If we found tables, reconstruct the text with proper table markers
+    if table_sections:
+        formatted_sections = []
+        
+        # Process non-table sections first
+        for section in non_table_sections:
+            if section.strip():
+                formatted_sections.append(format_regular_text(section))
+        
+        # Process table sections with proper markers
+        for table_section in table_sections:
+            formatted_sections.append(f"TABLE_START\n{table_section['content']}\nTABLE_END")
+        
+        return '\n\n'.join(formatted_sections)
+    else:
+        # No tables found, use regular formatting
+        return format_regular_text(original_text)
+
+def format_regular_text(text: str) -> str:
+    """Format regular text without tables."""
+    if not text:
+        return ""
+    
     text = re.sub(r'(\d+\.)\s*\n\s*([A-Za-z])', r'\1 \2', text)
     text = re.sub(r'([A-Za-z\)]\s+)(\d+\.)(?=\s*[A-Za-z])', r'\1\n\2', text)
     text = re.sub(r'\n\s*(\d+)\s*\n\s*(\d+\.)', r'\n\1\2', text)
@@ -682,6 +760,8 @@ def format_response_text(text: str) -> str:
     for line in raw_lines:
         line = line.strip()
         if not line:
+            if lines and lines[-1] != "":
+                lines.append("")
             continue
         
         if re.match(r'^\d+$', line):
@@ -712,7 +792,8 @@ def format_response_text(text: str) -> str:
                 dept_match = re.search(r'([A-Za-z\s]+department)', line, re.IGNORECASE)
                 if dept_match:
                     dept_name = dept_match.group(1).title()
-                    lines.append("")
+                    if lines and lines[-1] != "":
+                        lines.append("")
                     lines.append(f"**{dept_name}**")
                     
                     remaining = line[dept_match.end():].strip()
@@ -720,7 +801,8 @@ def format_response_text(text: str) -> str:
                         remaining = re.sub(r'^:?\s*is:?\s*', '', remaining)
                     if remaining:
                         lines.append(remaining)
-                    lines.append("")
+                    if lines[-1] != "":
+                        lines.append("")
                     continue
             
             if any(phrase in line.lower() for phrase in ['mentioned:', 'list of', 'includes', 'following', 'columns:']):
@@ -745,7 +827,8 @@ async def startup_event():
     print("Starting KG Hospital Chatbot API v2.0.0")
     print("=" * 60)
     print(f"Firebase Status: {'✓ Connected' if FIREBASE_INITIALIZED else '✗ Not Connected'}")
-    print(f"Firestore Status: {'✓ Enabled' if db is not None else '✗ Disabled'}")
+    print(f"Firestore Status: {'✓ Enabled' if FIREBASE_INITIALIZED and db else '✗ Disabled'}")
+    print(f"Storage Mode: {'Firestore' if FIREBASE_INITIALIZED and db else 'In-Memory (Fallback)'}")
 
     if FIREBASE_INITIALIZED:
         print("\nLoading initial documents from Firebase Storage...")
@@ -790,6 +873,9 @@ async def chat(message: ChatMessage):
                 - Treatment information and medical procedures
                 - Emergency contacts and protocols
                 
+                When presenting data in tables, use proper markdown table format with clear headers and separators.
+                Use | and - characters to create clean, readable tables.
+                
                 If someone requests an appointment, guide them to provide:
                 1. Their full name
                 2. Phone number
@@ -808,6 +894,8 @@ async def chat(message: ChatMessage):
                 - Parking information and facilities
                 - Hospital amenities and services
                 
+                When using tables, ensure they are properly formatted with headers and separators.
+                
                 Format your answers using natural sentences and organize information clearly.""",
 
                 "staff": """You are a helpful KG Hospital AI assistant helping hospital staff.
@@ -818,6 +906,8 @@ async def chat(message: ChatMessage):
                 - Emergency protocols and procedures
                 - Hospital policies and guidelines
                 
+                Use proper table formatting when presenting structured data.
+                
                 Format your answers using clear sentences and organize information logically.""",
 
                 "admin": """You are a helpful KG Hospital AI assistant helping administrators.
@@ -827,6 +917,8 @@ async def chat(message: ChatMessage):
                 - System status and analytics
                 - Administrative procedures
                 - Staff coordination and policies
+                
+                Present data in well-formatted tables when appropriate.
                 
                 Format your output using clear paragraphs and organize information systematically."""
             }
@@ -859,7 +951,7 @@ async def chat(message: ChatMessage):
                 answer += "\n\n📋 To book an appointment, please provide your full name and phone number so our team can contact you to confirm the appointment details."
                 print("⚠ Appointment request detected but missing contact details")
 
-        # Save chat history - THIS IS NOW WORKING PROPERLY
+        # Save chat history - NOW WORKING WITH FALLBACK
         save_result = save_chat_history(
             user_id=message.user_id or str(uuid.uuid4()),
             user_role=message.user_role,
@@ -898,15 +990,16 @@ async def get_chat_history(user_role: Optional[str] = None, limit: int = 100):
         return {
             "history": history,
             "count": len(history),
-            "filtered_by": user_role or "all"
+            "filtered_by": user_role or "all",
+            "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory"
         }
     except Exception as e:
         print(f"Error in chat-history endpoint: {e}")
-        # Return empty array instead of crashing
         return {
             "history": [],
             "count": 0,
             "filtered_by": user_role or "all",
+            "storage_mode": "error",
             "error": str(e)
         }
 
@@ -918,10 +1011,17 @@ async def get_appointments(status: Optional[str] = None):
         return {
             "appointments": appointments,
             "count": len(appointments),
-            "filtered_by": status or "all"
+            "filtered_by": status or "all",
+            "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving appointments: {str(e)}")
+        return {
+            "appointments": [],
+            "count": 0,
+            "filtered_by": status or "all",
+            "storage_mode": "error",
+            "error": str(e)
+        }
 
 @app.post("/admin/appointments/action")
 async def handle_appointment_action(action: AppointmentAction):
@@ -957,11 +1057,12 @@ async def get_admin_notifications(limit: int = 20):
         notifications = get_admin_notifications(limit=limit)
         return {
             "notifications": notifications,
-            "count": len(notifications)
+            "count": len(notifications),
+            "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory"
         }
     except Exception as e:
         print(f"Error retrieving notifications: {e}")
-        return {"notifications": [], "count": 0}
+        return {"notifications": [], "count": 0, "storage_mode": "error"}
 
 @app.post("/admin/notifications/mark-read")
 async def mark_notification_read(notification_id: str):
@@ -996,7 +1097,8 @@ async def get_admin_statistics():
             "accepted_appointments": len(accepted_appointments),
             "rejected_appointments": len(rejected_appointments),
             "conversations_by_role": role_counts,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving statistics: {str(e)}")
@@ -1011,7 +1113,8 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "firebase_initialized": FIREBASE_INITIALIZED,
-        "firestore_enabled": db is not None,
+        "firestore_enabled": FIREBASE_INITIALIZED and db is not None,
+        "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory",
         "documents_loaded": len(loaded_documents) > 0,
         "features": ["chat", "appointments", "admin_dashboard", "chat_history", "notifications"]
     }
@@ -1067,7 +1170,8 @@ async def reload_documents_endpoint():
 async def system_status():
     return {
         "firebase_initialized": FIREBASE_INITIALIZED,
-        "firestore_enabled": db is not None,
+        "firestore_enabled": FIREBASE_INITIALIZED and db is not None,
+        "storage_mode": "firestore" if FIREBASE_INITIALIZED and db else "memory",
         "documents_loaded": len(loaded_documents),
         "vectorstore_ready": vectorstore is not None,
         "conversation_chain_ready": conversation_chain is not None,
